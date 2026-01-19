@@ -45,6 +45,7 @@ dependencies:
   permission_handler: ^12.0.1
   go_router: ^17.0.0
   dio: ^5.9.0
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
@@ -71,9 +72,13 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/products.json
+    # - assets/products.json
+    # - assets/images/agent.png
     - assets/images/number_egg_logo.png
     - assets/images/number_egg_logo1.png
+    - assets/images/profile_placeholder.jpg
+    - assets/images/egg.jpg
+    - assets/images/egg.jpg
 
 
   # To add assets to your application, add an assets section, like this:

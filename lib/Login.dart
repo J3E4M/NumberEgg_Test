@@ -21,33 +21,34 @@ class _LoginPageState extends State<LoginPage> {
   Map<String, dynamic>? result;
 
   Future<void> _login() async {
-    const serverURL = 'https://mobile.wattanapong.com/api/auth/login';
+    // const serverURL = 'https://mobile.wattanapong.com/api/auth/login';
 
-    try {
-      final response = await dio.post(
-        serverURL,
-        data: {
-          'email': _emailController.text,
-          'pass': _passwordController.text,
-        },
-      );
+    // try {
+    //   final response = await dio.post(
+    //     serverURL,
+    //     data: {
+    //       'email': _emailController.text,
+    //       'pass': _passwordController.text,
+    //     },
+    //   );
+      
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        final prefs = await SharedPreferences.getInstance();
-        prefs.setString('name', data['member']['name']);
-        prefs.setString('email', data['member']['email']);
+      // if (response.statusCode == 200) {
+      //   final data = response.data;
+      //   final prefs = await SharedPreferences.getInstance();
+      //   prefs.setString('name', data['member']['name']);
+      //   prefs.setString('email', data['member']['email']);
 
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/member');
         }
-      }
-    } on DioException catch (e) {
-      setState(() {
-        _errorMessage = e.response?.data['message'] ?? e.message;
-      });
-    }
-  }
+      // }
+    } //on DioException catch (e) {
+  //     setState(() {
+  //       _errorMessage = e.response?.data['message'] ?? e.message;
+  //     });
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -61,9 +62,9 @@ class _LoginPageState extends State<LoginPage> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFFFF8C6), // เหลืองอ่อนด้านบน
-              Color(0xFFFFF2A8), // กลาง
-              Color(0xFFFFF8C6), // ล่าง
+              Color(0xFFFFF7CC),
+              Colors.white,
+              Color(0xFFFFF7CC),
             ],
           ),
         ),
@@ -94,6 +95,7 @@ class _LoginPageState extends State<LoginPage> {
                     fit: BoxFit.contain,
                   ),
                 ),
+
                 const SizedBox(height: 36),
 
                 // 🔁 Toggle Login / Register
@@ -138,7 +140,6 @@ class _LoginPageState extends State<LoginPage> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 28),
 
                 // 📧 Email
@@ -189,7 +190,7 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: _login,
                     child: const Text(
                       'ยืนยัน',
-                      style: TextStyle(fontSize: 16 , color:Colors.white),
+                      style: TextStyle(fontSize: 16, color: Colors.white),
                     ),
                   ),
                 ),

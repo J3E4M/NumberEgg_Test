@@ -64,20 +64,18 @@ class _RegisterPageState extends State<RegisterPage> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFFFF8C6),
-              Color(0xFFFFF2A8),
-              Color(0xFFFFF8C6),
+              Color(0xFFFFF7CC),
+              Colors.white,
+              Color(0xFFFFF7CC),
             ],
           ),
         ),
-
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 const SizedBox(height: 16),
 
                 /// 🔙 BACK TO MAIN
@@ -96,7 +94,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 Center(
                   child: Image.asset(
                     'assets/images/number_egg_logo.png',
-                    width: 230,
+                    width: 230,  
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -192,7 +190,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     onPressed: register,
                     child: const Text(
                       'ยืนยัน',
-                      style: TextStyle(fontSize: 16 ,color:Colors.white),
+                      style: TextStyle(fontSize: 16, color: Colors.white),
                     ),
                   ),
                 ),

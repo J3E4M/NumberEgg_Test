@@ -25,15 +25,14 @@ class MainPage extends StatelessWidget {
             children: [
               const Spacer(),
 
-              
               // ---------- LOGO ----------
               Center(
-                  child: Image.asset(
-                    'assets/images/number_egg_logo1.png',
-                    width: 230,
-                    fit: BoxFit.contain,
-                  ),
+                child: Image.asset(
+                  'assets/images/number_egg_logo1.png',
+                  width: 230,
+                  fit: BoxFit.contain,
                 ),
+              ),
 
               const SizedBox(height: 40),
 
