@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'database/egg_database.dart'; // 🔧 ปรับ path ให้ตรงโปรเจกต์คุณ
 
 const List<String> yoloClasses = [
   "egg", // class 0
@@ -36,12 +37,16 @@ void main() async {
   runApp(const MyApp());
 }
 
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      scaffoldMessengerKey: scaffoldMessengerKey, // ⭐ เพิ่ม
       debugShowCheckedModeBanner: false,
       home: SelectImageScreen(),
     );
@@ -231,11 +236,69 @@ class DisplayPictureScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.save),
+                label: const Text("บันทึกผลตรวจไข่"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                onPressed: () async {
+                  await _saveToDatabase(context);
+                },
+              ),
             ],
           );
         },
       ),
     );
+  }
+
+  Future<void> _saveToDatabase(BuildContext context) async {
+    const double cmPerPixel = 0.02; // 🔧 ต้องตรงกับ Painter
+    print("START SAVE");
+    for (final d in detections) {
+      // ✅ บันทึกเฉพาะไข่
+      if (d.cls != 0) continue;
+
+      final widthCm = (d.x2 - d.x1) * cmPerPixel;
+      final heightCm = (d.y2 - d.y1) * cmPerPixel;
+
+      // 🥚 ตัวอย่างเกรด (คุณปรับทีหลังได้)
+      int grade;
+      if (widthCm >= 6.0) {
+        grade = 3;
+      } else if (widthCm >= 5.0) {
+        grade = 2;
+      } else if (widthCm >= 4.0) {
+        grade = 1;
+      } else {
+        grade = 0;
+      }
+
+      await EggDatabase.instance.insertEgg(
+        imageName: "picked_image.jpg", // หรือส่งชื่อจริงมา
+        widthCm: widthCm,
+        heightCm: heightCm,
+        grade: grade,
+        confidence: d.confidence,
+      );
+    }
+
+    if (context.mounted) {
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        const SnackBar(
+          content: Text("บันทึกผลตรวจไข่เรียบร้อย"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 }
 
