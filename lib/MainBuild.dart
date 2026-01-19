@@ -24,7 +24,7 @@ class LinkPage extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const MainPage(),
-        '/camera': (context) => const TakePictureScreen(),
+        '/camera': (context) => const SelectImageScreen(),
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/member': (context) => const HomePage(),
