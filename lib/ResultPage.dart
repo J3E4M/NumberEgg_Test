@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 class ResultPage extends StatelessWidget {
   const ResultPage({super.key});
@@ -18,15 +19,9 @@ class ResultPage extends StatelessWidget {
           'color': Colors.amber // สีเหลืองตามภาพตัวอย่าง
         };
       case 'เล็ก':
-        return {
-          'name': 'เล็ก (เบอร์ 2-3)',
-          'color': Colors.orange
-        };
+        return {'name': 'เล็ก (เบอร์ 2-3)', 'color': Colors.orange};
       default:
-        return {
-          'name': sizeKey,
-          'color': Colors.grey
-        };
+        return {'name': sizeKey, 'color': Colors.grey};
     }
   }
 
@@ -39,7 +34,7 @@ class ResultPage extends StatelessWidget {
       // 1. แยกจำนวนและประเภทจาก string เช่น "2xใหญ่" -> count=2, sizeKey="ใหญ่"
       final String tag = tagString.toString();
       final List<String> parts = tag.split('x');
-      
+
       int count = 1;
       String sizeKey = tag;
 
@@ -60,7 +55,7 @@ class ResultPage extends StatelessWidget {
               title: "Egg $eggCounter", // ชื่อไข่ตามลำดับ
               subtitle: details['name'], // ชื่อขนาด เช่น "ใหญ่ (เบอร์ 0)"
               // สร้างตัวเลขความมั่นใจจำลอง (เนื่องจากไม่มีในข้อมูล History)
-              confidence: "${98 - ((eggCounter - 1) % 5) * 2}%", 
+              confidence: "${98 - ((eggCounter - 1) % 5) * 2}%",
               iconColor: details['color'], // สีไอคอน
             ),
           ),
@@ -89,7 +84,7 @@ class ResultPage extends StatelessWidget {
     final int count = args['count'] ?? 0;
     final bool isSuccess = args['isSuccess'] ?? false;
     final List<dynamic> tags = args['tags'] ?? [];
-
+    final String? imagePath = args['imagePath'];
     const Color cardBgColor = Color(0xFFFFE082);
 
     return Scaffold(
@@ -105,7 +100,8 @@ class ResultPage extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           child: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black54, size: 18),
+            icon: const Icon(Icons.arrow_back_ios_new,
+                color: Colors.black54, size: 18),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -113,11 +109,15 @@ class ResultPage extends StatelessWidget {
           children: [
             const Text(
               "Result Store",
-              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+              style:
+                  TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
             ),
             Text(
               date,
-              style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.normal),
+              style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 12,
+                  fontWeight: FontWeight.normal),
             ),
           ],
         ),
@@ -140,17 +140,26 @@ class ResultPage extends StatelessWidget {
                       color: Colors.grey.shade100,
                       width: double.infinity,
                       height: 300,
-                      child: Image.asset(
-                        'assets/images/egg.jpg', // ใช้รูป logo ตามโค้ดเดิม
-                        fit: BoxFit.contain,
-                      ),
+                      child: imagePath != null && File(imagePath).existsSync()
+                          ? Image.file(
+                              File(imagePath),
+                              fit: BoxFit.contain,
+                            )
+                          : const Center(
+                              child: Icon(
+                                Icons.image,
+                                size: 60,
+                                color: Colors.grey,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 20),
 
                   // 2. Summary Card
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: cardBgColor.withOpacity(0.4),
                       borderRadius: BorderRadius.circular(30),
@@ -164,10 +173,9 @@ class ResultPage extends StatelessWidget {
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            isSuccess ? Icons.check : Icons.priority_high,
-                            color: Colors.white, 
-                            size: 20
-                          ),
+                              isSuccess ? Icons.check : Icons.priority_high,
+                              color: Colors.white,
+                              size: 20),
                         ),
                         const SizedBox(width: 15),
                         Column(
@@ -176,31 +184,38 @@ class ResultPage extends StatelessWidget {
                             Text(
                               isSuccess ? "การประมวลผล สำเร็จ" : "รอการตรวจสอบ",
                               style: TextStyle(
-                                color: isSuccess ? Colors.green.shade700 : Colors.orange.shade800,
+                                color: isSuccess
+                                    ? Colors.green.shade700
+                                    : Colors.orange.shade800,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
                             ),
                             Text(
                               "พบไข่ไก่จำนวน $count ฟอง",
-                              style: const TextStyle(color: Colors.black54, fontSize: 12),
+                              style: const TextStyle(
+                                  color: Colors.black54, fontSize: 12),
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 20),
                   const Text(
                     "รายละเอียด",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87),
                   ),
                   const SizedBox(height: 10),
 
                   // 3. รายการ Tags (ส่วนที่แก้ไข)
                   if (tags.isEmpty)
-                    const Text("ไม่มีรายละเอียดขนาด", style: TextStyle(color: Colors.grey))
+                    const Text("ไม่มีรายละเอียดขนาด",
+                        style: TextStyle(color: Colors.grey))
                   else
                     // เรียกใช้ฟังก์ชัน _generateEggList เพื่อสร้างรายการ
                     ..._generateEggList(tags),
@@ -208,7 +223,7 @@ class ResultPage extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // ปุ่ม Back
           //  Padding(
           //   padding: const EdgeInsets.all(20),
