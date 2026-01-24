@@ -36,6 +36,18 @@ class _HistoryPageState extends State<HistoryPage> {
     return Colors.grey;
   }
 
+  bool _isSectionAllowed(String section) {
+    switch (selectedFilter) {
+      case 'วันที่ผ่านมา':
+        return section == 'YESTERDAY';
+      case 'สัปดาห์ที่ผ่านมา':
+        return section == 'LAST WEEK';
+      case 'ทั้งหมด':
+      default:
+        return true; // 🔥 รวม OLDER ด้วย
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,16 +145,9 @@ class _HistoryPageState extends State<HistoryPage> {
                   }
 
                   // 🔁 Filter logic
-                  List<Map<String, dynamic>> displayList = rawData;
-                  if (selectedFilter == 'วันที่ผ่านมา') {
-                    displayList = rawData
-                        .where((e) => e['section'] == 'YESTERDAY')
-                        .toList();
-                  } else if (selectedFilter == 'สัปดาห์ที่ผ่านมา') {
-                    displayList = rawData
-                        .where((e) => e['section'] == 'LAST WEEK')
-                        .toList();
-                  }
+                  List<Map<String, dynamic>> displayList = rawData
+                      .where((e) => _isSectionAllowed(e['section']))
+                      .toList();
 
                   // 🔁 Group by section
                   final Map<String, List<Map<String, dynamic>>> groupedData =
@@ -157,11 +162,25 @@ class _HistoryPageState extends State<HistoryPage> {
                   for (var e in rawData) {
                     debugPrint(e.toString());
                   }
+                  for (var e in rawData) {
+                    debugPrint("day=${e['date']} section=${e['section']}");
+                  }
+                  const sectionOrder = [
+                    'TODAY',
+                    'YESTERDAY',
+                    'LAST WEEK',
+                    'OLDER'
+                  ];
+
+                  final orderedEntries = sectionOrder
+                      .where((key) => groupedData.containsKey(key))
+                      .map((key) => MapEntry(key, groupedData[key]!))
+                      .toList();
 
                   return ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     children: [
-                      ...groupedData.entries.map((entry) {
+                      ...orderedEntries.map((entry) {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [

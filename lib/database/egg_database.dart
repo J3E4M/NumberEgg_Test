@@ -136,18 +136,23 @@ class EggDatabase {
     );
 
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
     return result.map((row) {
-      final day = DateTime.parse(row['day'] as String);
-      final diff = now.difference(day).inDays;
+      final dayRaw = DateTime.parse(row['day'] as String);
+      final targetDay = DateTime(dayRaw.year, dayRaw.month, dayRaw.day);
+
+      final diff = today.difference(targetDay).inDays;
 
       String section;
       if (diff == 0) {
         section = 'TODAY';
       } else if (diff == 1) {
         section = 'YESTERDAY';
-      } else {
+      } else if (diff <= 7) {
         section = 'LAST WEEK';
+      } else {
+        section = 'OLDER';
       }
 
       // ✅ สร้าง tags จาก DB จริง
@@ -210,9 +215,9 @@ class EggDatabase {
   }
 
   Future<Map<String, dynamic>> getSummaryReport() async {
-  final db = await database;
+    final db = await database;
 
-  final result = await db.rawQuery('''
+    final result = await db.rawQuery('''
     SELECT
       SUM(egg_count) as totalEgg,
       AVG(success_percent) as avgSuccess,
@@ -222,6 +227,6 @@ class EggDatabase {
     FROM egg_session
   ''');
 
-  return result.first;
-}
+    return result.first;
+  }
 }

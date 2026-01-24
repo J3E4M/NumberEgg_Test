@@ -410,7 +410,11 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
 
     final successPercent = (successCount / eggCount) * 100;
     final imagePath = await _saveImageToLocal(widget.imageBytes);
+    final now = DateTime.now();
 
+    final day = "${now.year.toString().padLeft(4, '0')}-"
+        "${now.month.toString().padLeft(2, '0')}-"
+        "${now.day.toString().padLeft(2, '0')}";
     // ✅ INSERT SESSION (ได้ sessionId)
     final sessionId = await EggDatabase.instance.insertSession(
       imagePath: imagePath,
@@ -419,7 +423,7 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
       bigCount: bigCount,
       mediumCount: mediumCount,
       smallCount: smallCount,
-      day: DateTime.now().toIso8601String().substring(0, 10),
+      day: day,
     );
 
     // ✅ INSERT EGG ITEMS

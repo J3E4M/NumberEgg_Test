@@ -134,21 +134,21 @@ class _ProfilePageState extends State<ProfilePage> {
 
               // 🧾 Info Fields
               _infoField(
-                label: 'Name',
+                label: 'ชื่อ (Name)',
                 value: name,
                 icon: Icons.person,
               ),
               const SizedBox(height: 16),
 
               _infoField(
-                label: 'Email',
+                label: 'อีเมล (Email)',
                 value: email,
                 icon: Icons.mail_outline,
               ),
               const SizedBox(height: 16),
 
               _infoField(
-                label: 'Password',
+                label: 'รหัสผ่าน (Password)',
                 value: '************',
                 icon: Icons.lock,
               ),
@@ -168,10 +168,10 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ),
                     onPressed: _logout,
-                    icon: const Icon(Icons.logout),
+                    icon: const Icon(Icons.logout ,color: Colors.white),
                     label: const Text(
                       'ออกจากระบบ',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      style: TextStyle(fontWeight: FontWeight.bold ,color: Colors.white),
                     ),
                   ),
                 ),
