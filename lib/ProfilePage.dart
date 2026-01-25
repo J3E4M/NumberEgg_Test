@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'custom_bottom_nav.dart';
-import 'ProfileSettingPage.dart';
-import 'database/user_database.dart';
-import 'models/user.dart';
-import 'services/profile_image_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -16,65 +12,11 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   String name = '';
   String email = '';
-  User? currentUser;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
-    _loadCurrentUser();
-  }
-
-  Future<void> _loadCurrentUser() async {
-    try {
-      // ดึงข้อมูล user ที่ login อยู่จาก SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
-      
-      if (isLoggedIn) {
-        final userId = prefs.getInt('user_id');
-        final userName = prefs.getString('user_name') ?? '';
-        final userEmail = prefs.getString('user_email') ?? '';
-        final userPrivilege = prefs.getString('user_privilege') ?? '';
-        final userProfileImage = prefs.getString('user_profile_image') ?? '';
-        
-        if (userId != null) {
-          // สร้าง User object จากข้อมูลใน SharedPreferences
-          setState(() {
-            currentUser = User(
-              id: userId,
-              email: userEmail,
-              password: '', // ไม่ต้องเก็บ password ใน local storage
-              name: userName,
-              privilegeId: 1, // ค่าเริ่มต้น
-              createdAt: '',
-              updatedAt: '',
-              privilegeName: userPrivilege,
-              privilegeLevel: 1,
-              profileImagePath: userProfileImage.isNotEmpty ? userProfileImage : null, // เพิ่ม path รูปภาพ
-            );
-            name = userName;
-            email = userEmail;
-          });
-          print('Loaded current user from SharedPreferences: $currentUser');
-        }
-      } else {
-        print('No user is logged in');
-      }
-    } catch (e) {
-      debugPrint('Error loading current user: $e');
-    }
-  }
-
-  /// ดึงรูปโปรไฟล์จาก storage
-  ImageProvider? _getProfileImage() {
-    if (currentUser?.profileImagePath != null && currentUser!.profileImagePath!.isNotEmpty) {
-      final profileImage = ProfileImageService.getProfileImage(currentUser!.profileImagePath);
-      if (profileImage != null) {
-        return FileImage(profileImage);
-      }
-    }
-    return null; // ใช้ default icon
   }
 
   Future<void> _loadProfile() async {
@@ -126,13 +68,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   Stack(
                     children: [
-                      CircleAvatar(
+                      const CircleAvatar(
                         radius: 42,
-                        backgroundColor: Colors.grey.shade300,
-                        backgroundImage: _getProfileImage(),
-                        child: _getProfileImage() == null 
-                            ? const Icon(Icons.person, size: 42, color: Colors.grey)
-                            : null,
+                        backgroundImage:
+                            AssetImage('assets/images/profile_placeholder.jpg'),
                       ),
                       Positioned(
                         right: 0,
@@ -173,29 +112,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                             ),
-                            onPressed: () async {
-                              print('Edit profile button pressed');
-                              print('Current user: $currentUser');
-                              if (currentUser != null) {
-                                print('Navigating to ProfileSettingsPage');
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ProfileSettingsPage(
-                                      currentUser: currentUser!,
-                                    ),
-                                  ),
-                                );
-                                
-                                // รีเฟรชข้อมูลถ้ามีการเปลี่ยนแปลง
-                                if (result == true) {
-                                  print('Profile updated, refreshing data...');
-                                  await _loadCurrentUser();
-                                  await _loadProfile();
-                                }
-                              } else {
-                                print('Current user is null');
-                              }
+                            onPressed: () {
+                              // TODO: ไปหน้าแก้ไขโปรไฟล์
                             },
                             child: const Text(
                               'แก้ไขโปรไฟล์',
@@ -236,7 +154,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
 
               const SizedBox(height: 32),
-
 
               // 🚪 Logout Button
               Center(

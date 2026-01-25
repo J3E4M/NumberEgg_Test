@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '/MainPage.dart';
-import '/ProfileSettingPage.dart';
+import '/Login.dart';
+import '/Register.dart';
 import '/camera.dart';
 import '/HomePage.dart';
 import '/ProfilePage.dart';
 import '/HistoryPage.dart';
 import '/ResultPage.dart';
-import '/Login.dart';
-import '/Register.dart';
 
 void main() {
   runApp(const LinkPage());
@@ -24,10 +23,10 @@ class LinkPage extends StatelessWidget {
 
       initialRoute: '/',
       routes: {
-        '/': (context) => MainPage(),
-        '/login': (context) => LoginPage(),
-        '/register': (context) => RegisterPage(),
-        '/camera': (context) => const TakePictureScreen(),
+        '/': (context) => const MainPage(),
+        '/camera': (context) => const SelectImageScreen(),
+        '/login': (context) => const LoginPage(),
+        '/register': (context) => const RegisterPage(),
         '/member': (context) => const HomePage(),
         '/profile': (context) => const ProfilePage(),
         '/history': (context) => const HistoryPage(),
