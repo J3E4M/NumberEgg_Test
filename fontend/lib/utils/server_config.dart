@@ -1,5 +1,5 @@
 class ServerConfig {
-  static const String _defaultBaseUrl = 'http://192.168.1.186:8000';
+  static const String _defaultBaseUrl = 'http://10.0.2.2:8000'; // For emulator connection
   
   /// ดึง URL สำหรับการตรวจจับ
   static Future<String> getDetectUrl() async {

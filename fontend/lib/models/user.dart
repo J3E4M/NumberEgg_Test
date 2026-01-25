@@ -1,15 +1,17 @@
+// โมเดลข้อมูลผู้ใช้
 class User {
-  final int id;
-  final String email;
-  final String password;
-  final String name;
-  final int privilegeId;
-  final String createdAt;
-  final String updatedAt;
-  final String? privilegeName;
-  final int? privilegeLevel;
-  final String? profileImagePath; // เพิ่ม field สำหรับ path ของรูปโปรไฟล์
+  final int id; // รหัสผู้ใช้
+  final String email; // อีเมล
+  final String password; // รหัสผ่าน
+  final String name; // ชื่อผู้ใช้
+  final int privilegeId; // รหัสสิทธิ์
+  final String createdAt; // วันที่สร้าง
+  final String updatedAt; // วันที่อัพเดท
+  final String? privilegeName; // ชื่อสิทธิ์
+  final int? privilegeLevel; // ระดับสิทธิ์
+  final String? profileImagePath; // path ของรูปโปรไฟล์
 
+  // Constructor สำหรับสร้าง User
   User({
     required this.id,
     required this.email,
@@ -20,10 +22,10 @@ class User {
     required this.updatedAt,
     this.privilegeName,
     this.privilegeLevel,
-    this.profileImagePath, // เพิ่ม parameter
+    this.profileImagePath,
   });
 
-  /// ดึงข้อมูล privilege สำหรับความเข้ากันใช้งาน
+  // ดึงข้อมูล privilege สำหรับความเข้ากันใช้งาน
   String get privilegeNameDisplay => privilegeName ?? 'Unknown';
   int get privilegeLevelDisplay => privilegeLevel ?? 0;
 

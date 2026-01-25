@@ -272,6 +272,67 @@ async def login(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/register")
+async def register(request: Request):
+    """สมัครสมาชิก"""
+    try:
+        form = await request.form()
+        email = form.get("email")
+        password = form.get("password")
+        name = form.get("name")
+        privilege_id_str = form.get("privilege_id")
+        
+        if not email or not password or not name or not privilege_id_str:
+            raise HTTPException(status_code=400, detail="All fields are required")
+        
+        privilege_id = int(privilege_id_str)
+        
+        # Check if privilege exists
+        privilege = db.get_privilege_by_id(privilege_id)
+        if not privilege:
+            raise HTTPException(status_code=400, detail="Invalid privilege_id")
+        
+        # Check if email already exists
+        users = db.get_users()
+        for existing_user in users:
+            if existing_user[1] == email:  # existing_user[1] is email
+                raise HTTPException(status_code=400, detail="Email already exists")
+        
+        user_id = db.insert_user(
+            email=email,
+            password=password,
+            name=name,
+            privilege_id=privilege_id
+        )
+        return {"id": user_id, "message": "User registered successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/check-email")
+async def check_email(request: Request):
+    """ตรวจสอบอีเมลว่ามีอยู่แล้วหรือไม่"""
+    try:
+        form = await request.form()
+        email = form.get("email")
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Email is required")
+        
+        users = db.get_users()
+        for user in users:
+            if user[1] == email:  # user[1] is email
+                return {"exists": True, "message": "Email already exists"}
+        
+        return {"exists": False, "message": "Email available"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # User CRUD endpoints
 @app.post("/users", status_code=201)
 async def create_user(user: UserCreate):

@@ -1,12 +1,14 @@
+// โมเดลข้อมูลประวัติการตรวจจับไข่
 class EggHistory {
-  final int id;
-  final String imageName;
-  final double widthCm;
-  final double heightCm;
-  final int grade;
-  final double confidence;
-  final DateTime createdAt;
+  final int id; // รหัสประวัติ
+  final String imageName; // ชื่อรูปภาพ
+  final double widthCm; // ความกว้างในเซนติเมตร
+  final double heightCm; // ความสูงในเซนติเมตร
+  final int grade; // เกรดของไข่ (0-5)
+  final double confidence; //ความมั่นใจในการตรวจจับ (0.0-1.0)
+  final DateTime createdAt; // วันที่สร้างข้อมูล
 
+  // Constructor สำหรับสร้าง EggHistory
   EggHistory({
     required this.id,
     required this.imageName,
@@ -17,6 +19,7 @@ class EggHistory {
     required this.createdAt,
   });
 
+  // สร้าง EggHistory จาก Map (สำหรับดึงข้อมูลจากฐานข้อมูล)
   factory EggHistory.fromMap(Map<String, dynamic> map) {
     return EggHistory(
       id: map['id'],

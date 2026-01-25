@@ -84,6 +84,42 @@ def init_db():
         )
     """)
 
+    # Insert sample data
+    from datetime import datetime
+    now = datetime.now().isoformat()
+    
+    # Insert default privileges
+    cur.execute("""
+        INSERT INTO privileges (name, description, level, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, ("Admin", "System administrator", 1, now, now))
+    
+    cur.execute("""
+        INSERT INTO privileges (name, description, level, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, ("User", "Regular user", 2, now, now))
+    
+    cur.execute("""
+        INSERT INTO privileges (name, description, level, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, ("Guest", "Guest user", 3, now, now))
+    
+    # Insert sample users
+    cur.execute("""
+        INSERT INTO users (email, password, name, privilege_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, ("admin@number.egg.com", "admin123", "Administrator", 1, now, now))
+    
+    cur.execute("""
+        INSERT INTO users (email, password, name, privilege_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, ("user@number.egg.com", "user123", "Regular User", 2, now, now))
+    
+    cur.execute("""
+        INSERT INTO users (email, password, name, privilege_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, ("demo@number.egg.com", "demo123", "Demo User", 2, now, now))
+
     conn.commit()
     conn.close()
 

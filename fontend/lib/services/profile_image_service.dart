@@ -2,8 +2,9 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 
+// บริการจัดการรูปโปรไฟล์ผู้ใช้
 class ProfileImageService {
-  static const String _profileImageFolder = 'profile_images';
+  static const String _profileImageFolder = 'profile_images'; // ชื่อโฟลเดอร์เก็บรูปโปรไฟล์
   
   /// ดึงโฟลเดอร์สำหรับเก็บรูปโปรไฟล์
   static Future<Directory> _getProfileImageDir() async {
