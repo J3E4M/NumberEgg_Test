@@ -42,7 +42,7 @@ class MainPage extends StatelessWidget {
                 icon: Icons.camera_alt,
                 color: const Color(0xFFFFB300),
                 onTap: () {
-                  Navigator.pushNamed(context, '/camera');
+                  Navigator.pushNamed(context, '/main');
                 },
               ),
 
