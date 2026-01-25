@@ -1,9 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import '../models/egg_history.dart';
-import '../utils/server_config.dart';
 
 class EggDatabase {
   EggDatabase._();
@@ -23,7 +20,7 @@ class EggDatabase {
 
     return await openDatabase(
       path,
-      version: 4, // ⭐ เพิ่ม version สำหรับ bounding box coordinates
+      version: 3, // ⭐ เพิ่ม version
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -50,10 +47,6 @@ class EggDatabase {
       session_id INTEGER NOT NULL,
       grade INTEGER NOT NULL,
       confidence REAL NOT NULL,
-      x1 REAL NOT NULL,
-      y1 REAL NOT NULL,
-      x2 REAL NOT NULL,
-      y2 REAL NOT NULL,
       FOREIGN KEY (session_id) REFERENCES egg_session(id)
     )
   ''');
@@ -77,14 +70,6 @@ class EggDatabase {
         FOREIGN KEY (session_id) REFERENCES egg_session(id)
       )
     ''');
-    }
-    
-    if (oldVersion < 4) {
-      // Add bounding box columns to egg_item table
-      await db.execute('ALTER TABLE egg_item ADD COLUMN x1 REAL NOT NULL DEFAULT 0.0');
-      await db.execute('ALTER TABLE egg_item ADD COLUMN y1 REAL NOT NULL DEFAULT 0.0');
-      await db.execute('ALTER TABLE egg_item ADD COLUMN x2 REAL NOT NULL DEFAULT 0.0');
-      await db.execute('ALTER TABLE egg_item ADD COLUMN y2 REAL NOT NULL DEFAULT 0.0');
     }
   }
 
@@ -114,66 +99,27 @@ class EggDatabase {
       },
     );
 
-    return sessionId;
+    return sessionId; // ⭐ สำคัญ
   }
 
-  // ================== EGG ITEM CRUD ==================
-
-  Future<int> insertEggItem({
+  Future<void> insertEggItem({
     required int sessionId,
     required int grade,
     required double confidence,
-    double? x1,
-    double? y1,
-    double? x2,
-    double? y2,
   }) async {
     final db = await database;
-    return await db.insert('egg_item', {
-      'session_id': sessionId,
-      'grade': grade,
-      'confidence': confidence,
-      'x1': x1 ?? 0.0,
-      'y1': y1 ?? 0.0,
-      'x2': x2 ?? 0.0,
-      'y2': y2 ?? 0.0,
-    });
-  }
 
-  Future<List<Map<String, dynamic>>> getEggItemsBySession(int sessionId) async {
-    final db = await database;
-    return await db.query(
+    await db.insert(
       'egg_item',
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
-      orderBy: 'id ASC',
+      {
+        'session_id': sessionId,
+        'grade': grade,
+        'confidence': confidence,
+      },
     );
   }
 
-  Future<List<Map<String, dynamic>>> getAllEggItems() async {
-    final db = await database;
-    return await db.query('egg_item', orderBy: 'id DESC');
-  }
-
-  Future<int> updateEggItem(int id, {int? grade, double? confidence}) async {
-    final db = await database;
-    final Map<String, dynamic> data = {};
-    if (grade != null) data['grade'] = grade;
-    if (confidence != null) data['confidence'] = confidence;
-    return await db.update('egg_item', data, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<int> deleteEggItem(int id) async {
-    final db = await database;
-    return await db.delete('egg_item', where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<int> deleteEggItemsBySession(int sessionId) async {
-    final db = await database;
-    return await db.delete('egg_item', where: 'session_id = ?', whereArgs: [sessionId]);
-  }
-
-  // READ HISTORY
+  // ✅ READ HISTORY
   Future<List<Map<String, dynamic>>> getHistory() async {
     final db = await database;
     return db.query(
@@ -222,7 +168,6 @@ class EggDatabase {
       }
 
       return {
-        "sessionId": row['id'], // ✅ เพิ่ม session ID
         "section": section,
         "date": row['created_at'],
         "count": row['egg_count'],
@@ -283,24 +228,5 @@ class EggDatabase {
   ''');
 
     return result.first;
-  }
-
-  /// ลบข้อมูลไข่ทั้งหมด
-  static Future<void> clearAllEggData() async {
-    try {
-      final baseUrl = await ServerConfig.getApiUrl();
-      final response = await http.delete(
-        Uri.parse('$baseUrl/egg/clear-all'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        debugPrint('All egg data cleared successfully');
-      } else {
-        throw Exception('Failed to clear egg data: ${response.body}');
-      }
-    } catch (e) {
-      throw Exception('Error clearing egg data: $e');
-    }
   }
 }

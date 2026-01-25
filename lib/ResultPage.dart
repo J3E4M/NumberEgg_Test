@@ -1,74 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'dart:ui' as ui;
-import 'package:path_provider/path_provider.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' as path;
-import 'database/egg_database.dart';
 
-class ResultPage extends StatefulWidget {
+class ResultPage extends StatelessWidget {
   const ResultPage({super.key});
-
-  @override
-  State<ResultPage> createState() => _ResultPageState();
-}
-
-class _ResultPageState extends State<ResultPage> {
-  ui.Image? _decodedImage;
-  List<Map<String, dynamic>> _eggItems = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadEggItems();
-    _decodeImage();
-  }
-
-  Future<void> _decodeImage() async {
-    final Map<String, dynamic>? args =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-    final String? imagePath = args?['imagePath'];
-    
-    if (imagePath != null && File(imagePath).existsSync()) {
-      try {
-        final bytes = await File(imagePath).readAsBytes();
-        final codec = await ui.instantiateImageCodec(bytes);
-        final frame = await codec.getNextFrame();
-        _decodedImage = frame.image; // Get the actual image from FrameInfo
-        setState(() {});
-      } catch (e) {
-        print('Error decoding image: $e');
-      }
-    }
-  }
-
-  Future<void> _loadEggItems() async {
-    final Map<String, dynamic>? args =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-    final int sessionId = args?['sessionId'];
-    
-    if (sessionId != null) {
-      try {
-        final db = await EggDatabase.instance.database;
-        final items = await db.query(
-          'egg_item',
-          where: 'session_id = ?',
-          whereArgs: [sessionId],
-          orderBy: 'id ASC',
-        );
-        
-        setState(() {
-          _eggItems = items.map((item) => {
-            'grade': item['grade'],
-            'confidence': item['confidence'],
-            'id': item['id'],
-          }).toList();
-        });
-      } catch (e) {
-        print('Error loading egg items: $e');
-      }
-    }
-  }
 
   // ฟังก์ชันช่วยแปลง ขนาด (เช่น "ใหญ่") เป็นชื่อเบอร์และสี
   // อัปเดตสีและชื่อให้ตรงกับภาพตัวอย่าง (Screenshot)
@@ -206,34 +140,18 @@ class _ResultPageState extends State<ResultPage> {
                       color: Colors.grey.shade100,
                       width: double.infinity,
                       height: 300,
-                      child: Stack(
-                        children: [
-                          // Original image
-                          imagePath != null && File(imagePath).existsSync()
-                              ? Image.file(
-                                  File(imagePath),
-                                  fit: BoxFit.contain,
-                                )
-                              : const Center(
-                                  child: Icon(
-                                    Icons.image,
-                                    size: 60,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                          // Detection overlay with numbers
-                          if (_decodedImage != null && _eggItems.isNotEmpty)
-                            Positioned.fill(
-                              child: CustomPaint(
-                                painter: EggNumberOverlayPainter(
-                                  eggItems: _eggItems,
-                                  imageWidth: _decodedImage!.width.toDouble(),
-                                  imageHeight: _decodedImage!.height.toDouble(),
-                                ),
+                      child: imagePath != null && File(imagePath).existsSync()
+                          ? Image.file(
+                              File(imagePath),
+                              fit: BoxFit.contain,
+                            )
+                          : const Center(
+                              child: Icon(
+                                Icons.image,
+                                size: 60,
+                                color: Colors.grey,
                               ),
                             ),
-                        ],
-                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -403,94 +321,4 @@ class _ResultPageState extends State<ResultPage> {
       ),
     );
   }
-}
-
-/// Custom painter to draw numbers on detected eggs
-class EggNumberOverlayPainter extends CustomPainter {
-  final List<Map<String, dynamic>> eggItems;
-  final double imageWidth;
-  final double imageHeight;
-
-  EggNumberOverlayPainter({
-    required this.eggItems,
-    required this.imageWidth,
-    required this.imageHeight,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    final labelPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final textPainter = TextPainter(
-      textDirection: TextDirection.ltr,
-    );
-
-    for (int i = 0; i < eggItems.length; i++) {
-      final eggItem = eggItems[i];
-      
-      // Get bounding box coordinates from database
-      final x1 = eggItem['x1'] as double? ?? 0.0;
-      final y1 = eggItem['y1'] as double? ?? 0.0;
-      final x2 = eggItem['x2'] as double? ?? 0.0;
-      final y2 = eggItem['y2'] as double? ?? 0.0;
-      
-      // Scale to display size
-      final scaleX = size.width / imageWidth;
-      final scaleY = size.height / imageHeight;
-      
-      final rect = Rect.fromLTRB(
-        x1 * scaleX,
-        y1 * scaleY,
-        x2 * scaleX,
-        y2 * scaleY,
-      );
-
-      // Draw bounding box
-      canvas.drawRect(rect, paint);
-
-      // Draw number
-      final labelText = '${i + 1}';
-      textPainter.text = TextSpan(
-        text: labelText,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      );
-      
-      textPainter.layout();
-      final textWidth = textPainter.width;
-      final textHeight = textPainter.height;
-      
-      // Draw number background
-      final labelRect = Rect.fromLTWH(
-        rect.left,
-        rect.top - textHeight - 4,
-        textWidth + 8,
-        textHeight + 4,
-      );
-      
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(labelRect, const Radius.circular(4)),
-        labelPaint,
-      );
-      
-      // Draw number text
-      textPainter.paint(
-        canvas,
-        Offset(rect.left + 4, rect.top - textHeight - 2),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant oldDelegate) => false;
 }
