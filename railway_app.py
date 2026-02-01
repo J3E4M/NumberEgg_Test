@@ -23,7 +23,17 @@ import uuid
 import shutil
 from pathlib import Path
 
-app = FastAPI(title="NumberEgg YOLO API", version="1.0.0")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    load_model()
+    init_supabase()
+    yield
+    # Shutdown (if needed)
+
+app = FastAPI(title="NumberEgg YOLO API", version="1.0.0", lifespan=lifespan)
 
 # Load environment variables
 load_dotenv()
@@ -80,11 +90,6 @@ def load_model():
     except Exception as e:
         print(f"❌ Failed to load YOLO model: {e}")
         raise
-
-@app.on_event("startup")
-async def startup_event():
-    load_model()
-    init_supabase()
 
 @app.get("/")
 async def root():
