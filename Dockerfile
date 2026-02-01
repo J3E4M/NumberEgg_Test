@@ -1,38 +1,22 @@
-# Use Python 3.9 Alpine image (much smaller)
+# Ultra minimal - no AI, just API
 FROM python:3.9-alpine
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies (Alpine packages)
-RUN apk add --no-cache \
-    libgcc \
-    libstdc++ \
-    libgomp \
-    musl \
-    wget \
-    curl
+# Install minimal dependencies
+RUN apk add --no-cache wget curl
 
-# Copy requirements first for better caching
-COPY railway_requirements_fixed.txt requirements.txt
+# Copy requirements (minimal)
+COPY railway_requirements_minimal.txt requirements.txt
 
-# Install Python dependencies with CPU-only PyTorch
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir torch==2.0.1+cpu torchvision==0.15.2+cpu --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir -r requirements.txt \
-    && pip cache purge
+# Install Python packages
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY railway_app.py .
+# Copy app
+COPY railway_app_simple.py .
 
-# Download YOLO model (smaller version)
-RUN wget -O yolov8n.pt https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
-
-# Create uploads directory
+# Create uploads
 RUN mkdir -p /app/uploads
 
-# Expose port
 EXPOSE 8000
-
-# Run the application
-CMD ["python", "railway_app.py"]
+CMD ["python", "railway_app_simple.py"]
