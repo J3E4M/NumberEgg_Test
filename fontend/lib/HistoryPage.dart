@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'custom_bottom_nav.dart';
 import '../database/egg_database.dart';
 import '../database/user_database.dart';
+import '../services/supabase_service.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -809,42 +810,81 @@ class _HistoryPageState extends State<HistoryPage> {
       final totalEggs = bigCount + mediumCount + smallCount;
       final successPercent = double.parse(_successPercentController.text);
 
-      // สร้าง session ใหม่
+      // สร้าง session ใหม่ใน Supabase (แทน local SQLite)
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id') ?? 1; // Default to 1 if not found
       
-      final sessionId = await EggDatabase.instance.insertSession(
-        userId: userId,
-        imagePath: _selectedImagePath!,
-        eggCount: totalEggs,
-        successPercent: successPercent,
-        bigCount: bigCount,
-        mediumCount: mediumCount,
-        smallCount: smallCount,
-        day: DateTime.now().toIso8601String().substring(0, 10),
-      );
+      try {
+        // สร้าง egg items สำหรับส่งไป Supabase
+        final eggItems = <Map<String, dynamic>>[];
+        for (int i = 0; i < totalEggs; i++) {
+          int grade;
+          double confidence;
+          
+          if (i < bigCount) {
+            grade = 3; // ใหญ่
+            confidence = 85.0 + (i * 2.0); // 85-95%
+          } else if (i < bigCount + mediumCount) {
+            grade = 2; // กลาง
+            confidence = 75.0 + ((i - bigCount) * 3.0); // 75-90%
+          } else {
+            grade = 1; // เล็ก
+            confidence = 65.0 + ((i - bigCount - mediumCount) * 4.0); // 65-85%
+          }
 
-      // เพิ่ม egg items (สร้างข้อมูลจำลองสำหรับแต่ละไข่)
-      for (int i = 0; i < totalEggs; i++) {
-        int grade;
-        double confidence;
-        
-        if (i < bigCount) {
-          grade = 3; // ใหญ่
-          confidence = 85.0 + (i * 2.0); // 85-95%
-        } else if (i < bigCount + mediumCount) {
-          grade = 2; // กลาง
-          confidence = 75.0 + ((i - bigCount) * 3.0); // 75-90%
-        } else {
-          grade = 1; // เล็ก
-          confidence = 65.0 + ((i - bigCount - mediumCount) * 4.0); // 65-85%
+          eggItems.add({
+            'grade': grade,
+            'confidence': confidence,
+          });
         }
 
-        await EggDatabase.instance.insertEggItem(
-          sessionId: sessionId,
-          grade: grade,
-          confidence: confidence,
+        // สร้าง session พร้อม items ใน Supabase
+        await SupabaseService.createEggSessionWithItems(
+          userId: userId,
+          imagePath: _selectedImagePath!,
+          eggCount: totalEggs,
+          successPercent: successPercent,
+          bigCount: bigCount,
+          mediumCount: mediumCount,
+          smallCount: smallCount,
+          day: DateTime.now().toIso8601String().substring(0, 10),
+          eggItems: eggItems,
         );
+      } catch (e) {
+        // Fallback ไป local SQLite ถ้า Supabase ล้มเหลว
+        final sessionId = await EggDatabase.instance.insertSession(
+          userId: userId,
+          imagePath: _selectedImagePath!,
+          eggCount: totalEggs,
+          successPercent: successPercent,
+          bigCount: bigCount,
+          mediumCount: mediumCount,
+          smallCount: smallCount,
+          day: DateTime.now().toIso8601String().substring(0, 10),
+        );
+
+        // เพิ่ม egg items (สร้างข้อมูลจำลองสำหรับแต่ละไข่)
+        for (int i = 0; i < totalEggs; i++) {
+          int grade;
+          double confidence;
+          
+          if (i < bigCount) {
+            grade = 3; // ใหญ่
+            confidence = 85.0 + (i * 2.0); // 85-95%
+          } else if (i < bigCount + mediumCount) {
+            grade = 2; // กลาง
+            confidence = 75.0 + ((i - bigCount) * 3.0); // 75-90%
+          } else {
+            grade = 1; // เล็ก
+            confidence = 65.0 + ((i - bigCount - mediumCount) * 4.0); // 65-85%
+          }
+
+          await EggDatabase.instance.insertEggItem(
+            sessionId: sessionId,
+            grade: grade,
+            confidence: confidence,
+          );
+        }
       }
 
       if (mounted) {

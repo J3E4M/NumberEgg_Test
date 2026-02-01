@@ -14,11 +14,15 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'utils/server_config.dart'; // เพิ่ม import ServerConfig
+import 'package:image_picker/image_picker.dart';
+import 'utils/server_config.dart'; // 
+import 'services/supabase_service.dart'; // 
 
 const List<String> yoloClasses = [
   "egg", // class 0
-  // เพิ่ม class อื่นได้
+  "egg1", // class 1
+  "egg2", // class 2
+  // 
 ];
 
 /// ================== MODEL ==================
@@ -607,32 +611,65 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
     final day = "${now.year.toString().padLeft(4, '0')}-"
         "${now.month.toString().padLeft(2, '0')}-"
         "${now.day.toString().padLeft(2, '0')}";
-    // ✅ INSERT SESSION (ได้ sessionId)
+    // ✅ INSERT SESSION TO SUPABASE (แทน local SQLite)
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('user_id') ?? 1; // Default to 1 if not found
     
-    final sessionId = await EggDatabase.instance.insertSession(
-      userId: userId,
-      imagePath: imagePath,
-      eggCount: eggCount,
-      successPercent: successPercent,
-      bigCount: bigCount,
-      mediumCount: mediumCount,
-      smallCount: smallCount,
-      day: day,
-    );
+    try {
+      // สร้าง egg items สำหรับส่งไป Supabase
+      final eggItems = <Map<String, dynamic>>[];
+      for (final d in widget.detections) {
+        if (d.cls != 0) continue;
+        
+        final grade = _calculateGrade(d);
+        eggItems.add({
+          'grade': grade,
+          'confidence': d.confidence * 100,
+          'x1': d.x1,
+          'y1': d.y1,
+          'x2': d.x2,
+          'y2': d.y2,
+        });
+      }
 
-    // ✅ INSERT EGG ITEMS
-    for (final d in widget.detections) {
-      if (d.cls != 0) continue;
-
-      final grade = _calculateGrade(d);
-
-      await EggDatabase.instance.insertEggItem(
-        sessionId: sessionId,
-        grade: grade,
-        confidence: d.confidence * 100,
+      // สร้าง session พร้อม items ใน Supabase
+      await SupabaseService.createEggSessionWithItems(
+        userId: userId,
+        imagePath: imagePath,
+        eggCount: eggCount,
+        successPercent: successPercent,
+        bigCount: bigCount,
+        mediumCount: mediumCount,
+        smallCount: smallCount,
+        day: day,
+        eggItems: eggItems,
       );
+
+      debugPrint("SAVE TO SUPABASE DONE: $eggCount eggs");
+    } catch (e) {
+      debugPrint("Error saving to Supabase: $e");
+      // Fallback ไป local SQLite ถ้า Supabase ล้มเหลว
+      final sessionId = await EggDatabase.instance.insertSession(
+        userId: userId,
+        imagePath: imagePath,
+        eggCount: eggCount,
+        successPercent: successPercent,
+        bigCount: bigCount,
+        mediumCount: mediumCount,
+        smallCount: smallCount,
+        day: day,
+      );
+
+      for (final d in widget.detections) {
+        if (d.cls != 0) continue;
+        final grade = _calculateGrade(d);
+        await EggDatabase.instance.insertEggItem(
+          sessionId: sessionId,
+          grade: grade,
+          confidence: d.confidence * 100,
+        );
+      }
+      debugPrint("FALLBACK TO LOCAL DB: $eggCount eggs");
     }
 
     debugPrint("SAVE DONE: $eggCount eggs");

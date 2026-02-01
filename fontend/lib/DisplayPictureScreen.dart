@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database/egg_database.dart';
+import 'services/supabase_service.dart';
 
 // --- หน้าแสดงผลและ Save หลังจากถ่ายภาพ ---
 class DisplayPictureScreen extends StatefulWidget {
@@ -88,30 +89,52 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id') ?? 1;
       
-      // สร้างข้อมูลจำลอง
-      final sessionId = await EggDatabase.instance.insertSession(
-        userId: userId,
-        imagePath: widget.imagePath,
-        eggCount: 2, // จำลองว่ามี 2 ฟอง
-        successPercent: 95.0, // จำลอง
-        bigCount: 1,
-        mediumCount: 1,
-        smallCount: 0,
-        day: DateTime.now().toString().substring(0, 10),
-      );
+      // สร้างข้อมูลจำลองใน Supabase (แทน local SQLite)
+      try {
+        // สร้าง egg items สำหรับส่งไป Supabase
+        final eggItems = [
+          {'grade': 3, 'confidence': 98.0}, // ไข่ใหญ่
+          {'grade': 2, 'confidence': 92.0}, // ไข่กลาง
+        ];
 
-      // จำลองการเพิ่ม egg items
-      await EggDatabase.instance.insertEggItem(
-        sessionId: sessionId,
-        grade: 3,
-        confidence: 98.0,
-      );
-      
-      await EggDatabase.instance.insertEggItem(
-        sessionId: sessionId,
-        grade: 2,
-        confidence: 92.0,
-      );
+        // สร้าง session พร้อม items ใน Supabase
+        await SupabaseService.createEggSessionWithItems(
+          userId: userId,
+          imagePath: widget.imagePath,
+          eggCount: 2, // จำลองว่ามี 2 ฟอง
+          successPercent: 95.0, // จำลอง
+          bigCount: 1,
+          mediumCount: 1,
+          smallCount: 0,
+          day: DateTime.now().toString().substring(0, 10),
+          eggItems: eggItems,
+        );
+      } catch (e) {
+        // Fallback ไป local SQLite ถ้า Supabase ล้มเหลว
+        final sessionId = await EggDatabase.instance.insertSession(
+          userId: userId,
+          imagePath: widget.imagePath,
+          eggCount: 2, // จำลองว่ามี 2 ฟอง
+          successPercent: 95.0, // จำลอง
+          bigCount: 1,
+          mediumCount: 1,
+          smallCount: 0,
+          day: DateTime.now().toString().substring(0, 10),
+        );
+
+        // จำลองการเพิ่ม egg items
+        await EggDatabase.instance.insertEggItem(
+          sessionId: sessionId,
+          grade: 3,
+          confidence: 98.0,
+        );
+        
+        await EggDatabase.instance.insertEggItem(
+          sessionId: sessionId,
+          grade: 2,
+          confidence: 92.0,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
