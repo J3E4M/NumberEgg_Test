@@ -45,6 +45,7 @@ class UserUpdate(BaseModel):
     privilege_id: Optional[int] = None
 
 class EggSessionCreate(BaseModel):
+    user_id: int
     image_path: str
     egg_count: int
     success_percent: float
@@ -54,6 +55,7 @@ class EggSessionCreate(BaseModel):
     day: str
 
 class EggSessionUpdate(BaseModel):
+    user_id: Optional[int] = None
     image_path: Optional[str] = None
     egg_count: Optional[int] = None
     success_percent: Optional[float] = None
@@ -72,6 +74,7 @@ class EggItemUpdate(BaseModel):
     confidence: Optional[float] = None
 
 class EggSessionWithItems(BaseModel):
+    user_id: int
     image_path: str
     egg_count: int
     success_percent: float
@@ -469,7 +472,13 @@ async def search_users(keyword: str):
 async def create_egg_session(session: EggSessionCreate):
     """สร้าง egg session ใหม่"""
     try:
+        # Check if user exists
+        user = db.get_user_by_id(session.user_id)
+        if not user:
+            raise HTTPException(status_code=400, detail="Invalid user_id")
+            
         session_id = db.insert_egg_session(
+            user_id=session.user_id,
             image_path=session.image_path,
             egg_count=session.egg_count,
             success_percent=session.success_percent,
@@ -489,6 +498,23 @@ async def get_egg_sessions():
     try:
         sessions = db.get_egg_sessions()
         return {"sessions": sessions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/egg-sessions/user/{user_id}")
+async def get_egg_sessions_by_user(user_id: int):
+    """ดึงข้อมูล egg sessions ตาม user_id"""
+    try:
+        # Check if user exists
+        user = db.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        sessions = db.get_egg_sessions_by_user(user_id)
+        return {"sessions": sessions}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -516,8 +542,15 @@ async def update_egg_session(session_id: int, session: EggSessionUpdate):
         if not existing:
             raise HTTPException(status_code=404, detail="Egg session not found")
         
+        # Check if user_id is valid
+        if session.user_id is not None:
+            user = db.get_user_by_id(session.user_id)
+            if not user:
+                raise HTTPException(status_code=400, detail="Invalid user_id")
+        
         db.update_egg_session(
             session_id=session_id,
+            user_id=session.user_id,
             image_path=session.image_path,
             egg_count=session.egg_count,
             success_percent=session.success_percent,
@@ -655,7 +688,13 @@ async def delete_egg_items_by_session(session_id: int):
 async def add_egg_with_quantities(data: EggSessionWithItems):
     """เพิ่มข้อมูล session พร้อม egg items พร้อมกัน"""
     try:
+        # Check if user exists
+        user = db.get_user_by_id(data.user_id)
+        if not user:
+            raise HTTPException(status_code=400, detail="Invalid user_id")
+            
         session_id = db.add_egg_with_quantities(
+            user_id=data.user_id,
             image_path=data.image_path,
             egg_count=data.egg_count,
             success_percent=data.success_percent,

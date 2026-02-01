@@ -5,6 +5,7 @@ import '../database/egg_database.dart';
 import '../database/user_database.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -809,7 +810,11 @@ class _HistoryPageState extends State<HistoryPage> {
       final successPercent = double.parse(_successPercentController.text);
 
       // สร้าง session ใหม่
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id') ?? 1; // Default to 1 if not found
+      
       final sessionId = await EggDatabase.instance.insertSession(
+        userId: userId,
         imagePath: _selectedImagePath!,
         eggCount: totalEggs,
         successPercent: successPercent,

@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'database/user_database.dart';
-import 'models/user.dart';
+import 'models/user.dart' as app_user;
 import 'services/profile_image_service.dart';
+import 'config/supabase_config.dart';
+import 'services/supabase_service.dart';
 
 class ProfileSettingsPage extends StatefulWidget {
-  final User currentUser;
+  final app_user.User currentUser;
 
   const ProfileSettingsPage({
     super.key,
@@ -25,7 +28,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   File? _selectedImage;
   bool _isLoading = false;
   bool _showPasswordFields = false;
@@ -149,27 +152,65 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
 
     try {
       String newName = widget.currentUser.name;
-      
-      // อัปเดตชื่อ
-      if (_nameController.text.trim() != widget.currentUser.name) {
-        newName = _nameController.text.trim();
-        await UserDatabase.updateUser(
-          id: widget.currentUser.id,
-          name: newName,
-        );
-      }
+      debugPrint('🔍 พยายามอัพเดทโปรไฟล์ผู้ใช้ ID: ${widget.currentUser.id}');
 
-      // อัปเดตรหัสผ่าน (ถ้ามีการเปลี่ยน)
-      if (_showPasswordFields && _newPasswordController.text.isNotEmpty) {
-        // ตรวจสอบรหัสผ่านปัจจุบัน
-        if (_currentPasswordController.text != widget.currentUser.password) {
-          throw Exception('รหัสผ่านปัจจุบันไม่ถูกต้อง');
+      // ตรวจสอบว่าเชื่อมต่อ Supabase ได้หรือไม่
+      if (SupabaseConfig.isConfigured) {
+        try {
+          // อัปเดตชื่อด้วย Supabase
+          if (_nameController.text.trim() != widget.currentUser.name) {
+            newName = _nameController.text.trim();
+            await Supabase.instance.client
+                .from('users')
+                .update({'name': newName, 'updated_at': DateTime.now().toIso8601String()})
+                .eq('id', widget.currentUser.id);
+            debugPrint('✅ อัพเดทชื่อด้วย Supabase สำเร็จ');
+          }
+
+          // อัปเดตรหัสผ่าน (ถ้ามีการเปลี่ยน)
+          if (_showPasswordFields && _newPasswordController.text.isNotEmpty) {
+            // ตรวจสอบรหัสผ่านปัจจุบัน (ใน production ควรเข้ารหัส)
+            if (_currentPasswordController.text != widget.currentUser.password) {
+              throw Exception('รหัสผ่านปัจจุบันไม่ถูกต้อง');
+            }
+
+            await Supabase.instance.client
+                .from('users')
+                .update({'password': _newPasswordController.text, 'updated_at': DateTime.now().toIso8601String()})
+                .eq('id', widget.currentUser.id);
+            debugPrint('✅ อัพเดทรหัสผ่านด้วย Supabase สำเร็จ');
+          }
+
+        } catch (supabaseError) {
+          debugPrint('❌ Supabase update failed: $supabaseError');
+          // Fallback ไปใช้ UserDatabase แบบเก่า
+          throw supabaseError;
+        }
+      } else {
+        // ใช้ UserDatabase แบบเก่า (fallback)
+        debugPrint('🔄 ใช้ UserDatabase แบบเก่า (fallback)');
+        
+        // อัปเดตชื่อ
+        if (_nameController.text.trim() != widget.currentUser.name) {
+          newName = _nameController.text.trim();
+          await UserDatabase.updateUser(
+            id: widget.currentUser.id,
+            name: newName,
+          );
         }
 
-        await UserDatabase.updateUser(
-          id: widget.currentUser.id,
-          password: _newPasswordController.text,
-        );
+        // อัปเดตรหัสผ่าน (ถ้ามีการเปลี่ยน)
+        if (_showPasswordFields && _newPasswordController.text.isNotEmpty) {
+          // ตรวจสอบรหัสผ่านปัจจุบัน
+          if (_currentPasswordController.text != widget.currentUser.password) {
+            throw Exception('รหัสผ่านปัจจุบันไม่ถูกต้อง');
+          }
+
+          await UserDatabase.updateUser(
+            id: widget.currentUser.id,
+            password: _newPasswordController.text,
+          );
+        }
       }
 
       // จัดการรูปภาพ (ถ้ามีการเปลี่ยน)
@@ -178,13 +219,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         try {
           // บันทึกรูปภาพใหม่
           newImagePath = await ProfileImageService.updateProfileImage(
-            _selectedImage!, 
-            widget.currentUser.id, 
-            widget.currentUser.profileImagePath
-          );
-          print('Profile image updated successfully: $newImagePath');
+              _selectedImage!,
+              widget.currentUser.id,
+              widget.currentUser.profileImagePath);
+          debugPrint('✅ Profile image updated successfully: $newImagePath');
         } catch (e) {
-          print('Error updating profile image: $e');
+          debugPrint('❌ Error updating profile image: $e');
           // ไม่ต้อง throw exception ให้ทำงานต่อได้
         }
       }
@@ -193,11 +233,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_name', newName);
       await prefs.setString('name', newName); // สำหรับ _loadProfile
-      await prefs.setString('user_profile_image', newImagePath ?? ''); // เพิ่ม path รูปภาพ
-      
-      print('Updated SharedPreferences with new name: $newName');
+      await prefs.setString(
+          'user_profile_image', newImagePath ?? ''); // เพิ่ม path รูปภาพ
+
+      debugPrint('✅ Updated SharedPreferences with new name: $newName');
       if (newImagePath != null) {
-        print('Updated SharedPreferences with profile image: $newImagePath');
+        debugPrint('✅ Updated SharedPreferences with profile image: $newImagePath');
       }
 
       if (mounted) {
@@ -207,11 +248,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // กลับไปหน้า ProfilePage พร้อมข้อมูลใหม่
         Navigator.pop(context, true);
       }
     } catch (e) {
+      debugPrint('❌ Profile update error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -427,7 +469,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                         activeColor: const Color(0xFFFFC107),
                       ),
                     ),
-                    
+
                     // ฟิลด์รหัสผ่าน (แสดงเมื่อเปิดใช้งาน)
                     if (_showPasswordFields) ...[
                       Padding(
@@ -445,7 +487,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                                 suffixIcon: IconButton(
                                   onPressed: () {
                                     setState(() {
-                                      _obscureCurrentPassword = !_obscureCurrentPassword;
+                                      _obscureCurrentPassword =
+                                          !_obscureCurrentPassword;
                                     });
                                   },
                                   icon: Icon(
@@ -463,7 +506,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                                       if (value == null || value.isEmpty) {
                                         return 'กรุณากรอกรหัสผ่านปัจจุบัน';
                                       }
-                                      if (value != widget.currentUser.password) {
+                                      if (value !=
+                                          widget.currentUser.password) {
                                         return 'รหัสผ่านปัจจุบันไม่ถูกต้อง';
                                       }
                                       return null;
@@ -471,7 +515,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                                   : null,
                             ),
                             const SizedBox(height: 16),
-                            
+
                             // รหัสผ่านใหม่
                             TextFormField(
                               controller: _newPasswordController,
@@ -482,7 +526,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                                 suffixIcon: IconButton(
                                   onPressed: () {
                                     setState(() {
-                                      _obscureNewPassword = !_obscureNewPassword;
+                                      _obscureNewPassword =
+                                          !_obscureNewPassword;
                                     });
                                   },
                                   icon: Icon(
@@ -495,10 +540,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              validator: _showPasswordFields ? _validatePassword : null,
+                              validator: _showPasswordFields
+                                  ? _validatePassword
+                                  : null,
                             ),
                             const SizedBox(height: 16),
-                            
+
                             // ยืนยันรหัสผ่านใหม่
                             TextFormField(
                               controller: _confirmPasswordController,
@@ -509,7 +556,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                                 suffixIcon: IconButton(
                                   onPressed: () {
                                     setState(() {
-                                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                                      _obscureConfirmPassword =
+                                          !_obscureConfirmPassword;
                                     });
                                   },
                                   icon: Icon(
@@ -522,10 +570,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              validator: _showPasswordFields ? _validateConfirmPassword : null,
+                              validator: _showPasswordFields
+                                  ? _validateConfirmPassword
+                                  : null,
                             ),
                             const SizedBox(height: 16),
-                            
+
                             // คำแนะนำรหัสผ่าน
                             Container(
                               padding: const EdgeInsets.all(12),
@@ -547,7 +597,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                                   const SizedBox(height: 4),
                                   const Text(
                                     '• ควรมีความยาวอย่างน้อย 6 ตัวอักษร\n• ควรประกอบด้วยตัวอักษรและตัวเลข\n• หลีกเลี่ยงการใช้ข้อมูลส่วนตัว',
-                                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                                    style: TextStyle(
+                                        fontSize: 11, color: Colors.grey),
                                   ),
                                 ],
                               ),
@@ -582,11 +633,9 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                     ),
                     const SizedBox(height: 12),
                     _buildInfoRow('อีเมล', widget.currentUser.email),
-                    _buildInfoRow('ระดับสิทธิ์', widget.currentUser.privilegeNameDisplay),
                     _buildInfoRow(
-                      'สร้างเมื่อ',
-                      _formatDate(widget.currentUser.createdAt),
-                    ),
+                        'ระดับสิทธิ์', widget.currentUser.privilegeNameDisplay),
+                    _buildInfoRow('STATUS : ONLINE',_formatDate(widget.currentUser.createdAt),),
                   ],
                 ),
               ),

@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '/custom_bottom_nav.dart';
 import '../database/egg_database.dart';
+import 'dart:ui' as ui;
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/rendering.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -177,8 +184,7 @@ class EggTrendLineChart extends StatelessWidget {
       return const Center(child: Text('ไม่มีข้อมูล'));
     }
 
-    final values =
-        data.map((e) => (e['total'] as num).toDouble()).toList();
+    final values = data.map((e) => (e['total'] as num).toDouble()).toList();
 
     final growthPercent = _calculateGrowthPercent(values);
     final color = _trendColor(growthPercent);
@@ -190,16 +196,14 @@ class EggTrendLineChart extends StatelessWidget {
         Row(
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 children: [
-                  Icon(_trendIcon(growthPercent),
-                      size: 14, color: color),
+                  Icon(_trendIcon(growthPercent), size: 14, color: color),
                   const SizedBox(width: 4),
                   Text(
                     _trendLabel(growthPercent),
@@ -313,18 +317,15 @@ class EggTrendLineChart extends StatelessWidget {
                   isCurved: true,
                   barWidth: 3,
                   color: color,
-
                   dotData: FlDotData(
                     show: true,
-                    getDotPainter: (_, __, ___, ____) =>
-                        FlDotCirclePainter(
+                    getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
                       radius: 4,
                       color: Colors.white,
                       strokeWidth: 2,
                       strokeColor: color,
                     ),
                   ),
-
                   belowBarData: BarAreaData(
                     show: true,
                     color: color.withOpacity(0.12),
@@ -338,7 +339,6 @@ class EggTrendLineChart extends StatelessWidget {
     );
   }
 }
-
 
 class TodayEggDonutChart extends StatelessWidget {
   final int big;
@@ -368,7 +368,7 @@ class TodayEggDonutChart extends StatelessWidget {
       return PieChartSectionData(
         value: e.count.toDouble(),
         color: e.color,
-        radius: highlight ? 48 : 42,
+        radius: highlight ? 38 : 34,
         title: e.count == 0 ? '' : '${e.label}\n${e.count}',
         titleStyle: const TextStyle(
           fontSize: 11,
@@ -516,6 +516,247 @@ class _EggItem {
 
 class _HomePageState extends State<HomePage> {
   String selectedFilter = 'ทั้งหมด';
+  final _eggCountCtrl = TextEditingController();
+  int _big = 0;
+  int _medium = 0;
+  int _small = 0;
+  DateTime _selectedDate = DateTime.now();
+  final GlobalKey _captureKey = GlobalKey();
+
+  int get _totalEgg => _big + _medium + _small;
+
+  Future<void> _captureAndSave() async {
+    try {
+      // 🔐 ขอ permission
+      final status = await Permission.photos.request();
+      if (!status.isGranted) return;
+
+      // 📸 Capture
+      final boundary = _captureKey.currentContext!.findRenderObject()
+          as RenderRepaintBoundary;
+
+      final ui.Image image = await boundary.toImage(pixelRatio: 3);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) return;
+
+      final pngBytes = byteData.buffer.asUint8List();
+
+      // 📂 โฟลเดอร์ Pictures
+      final directory = Directory('/storage/emulated/0/Pictures/NumberEgg');
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+
+      final filePath =
+          '${directory.path}/egg_report_${DateTime.now().millisecondsSinceEpoch}.png';
+
+      final file = File(filePath);
+      await file.writeAsBytes(pngBytes);
+
+      // 🔄 แจ้ง Android ให้ Gallery เห็น
+      await Process.run(
+        'am',
+        [
+          'broadcast',
+          '-a',
+          'android.intent.action.MEDIA_SCANNER_SCAN_FILE',
+          '-d',
+          'file://$filePath'
+        ],
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('📸 บันทึกรูปลง Gallery แล้ว')),
+      );
+    } catch (e) {
+      debugPrint('❌ Save error: $e');
+    }
+  }
+
+  Future<void> _confirmNewSession() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('เริ่ม Session ใหม่'),
+          content: const Text(
+            'การดำเนินการนี้จะลบข้อมูลการวิเคราะห์ทั้งหมด\nไม่สามารถกู้คืนได้ คุณต้องการดำเนินการต่อหรือไม่?',
+          ),
+          actions: [
+            TextButton(
+              child: const Text('ยกเลิก'),
+              onPressed: () => Navigator.pop(context, false),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('ยืนยันลบ'),
+              onPressed: () => Navigator.pop(context, true),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await EggDatabase.instance.clearAllData(); // ⬅️ ฟังก์ชัน DB
+      setState(() {}); // รีโหลด UI
+    }
+  }
+
+  Widget _eggInputField(
+    String label,
+    int value,
+    Function(int) onChanged,
+  ) {
+    return TextField(
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      onChanged: (v) => onChanged(int.tryParse(v) ?? 0),
+    );
+  }
+
+  void _showAddEggDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('เพิ่มข้อมูลไข่'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 🔢 TOTAL AUTO
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'จำนวนไข่ทั้งหมด',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '$_totalEgg ฟอง',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Divider(height: 24),
+
+                    _eggInputField('ไข่ใหญ่', _big, (v) {
+                      setDialogState(() => _big = v);
+                    }),
+                    const SizedBox(height: 10),
+
+                    _eggInputField('ไข่กลาง', _medium, (v) {
+                      setDialogState(() => _medium = v);
+                    }),
+                    const SizedBox(height: 10),
+
+                    _eggInputField('ไข่เล็ก', _small, (v) {
+                      setDialogState(() => _small = v);
+                    }),
+
+                    const SizedBox(height: 14),
+
+                    // 📅 DATE
+                    Row(
+                      children: [
+                        const Icon(Icons.date_range),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          child: const Text('เลือกวันที่'),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _selectedDate,
+                              firstDate: DateTime(2023),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => _selectedDate = picked);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('ยกเลิก'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                ElevatedButton(
+                  child: const Text('บันทึก'),
+                  onPressed: _totalEgg > 0 ? _saveManualEggData : null,
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _counterRow(String label, int value, Function(int) onChanged) {
+    return Row(
+      children: [
+        Expanded(child: Text('ไข่$label')),
+        IconButton(
+          icon: const Icon(Icons.remove),
+          onPressed: value > 0 ? () => onChanged(value - 1) : null,
+        ),
+        Text('$value'),
+        IconButton(
+          icon: const Icon(Icons.add),
+          onPressed: () => onChanged(value + 1),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveManualEggData() async {
+    if (_totalEgg <= 0) return;
+
+    final day =
+        '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('user_id') ?? 1; // Default to 1 if not found
+
+    await EggDatabase.instance.insertSession(
+      userId: userId,
+      imagePath: 'manual',
+      eggCount: _totalEgg,
+      successPercent: 100,
+      bigCount: _big,
+      mediumCount: _medium,
+      smallCount: _small,
+      day: day,
+    );
+
+    Navigator.pop(context);
+
+    setState(() {
+      _big = _medium = _small = 0;
+    });
+  }
 
   final List<String> filters = [
     'ทั้งหมด',
@@ -541,103 +782,154 @@ class _HomePageState extends State<HomePage> {
       ),
 
       // 📊 BODY
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ✅ FILTER (ทั้งหมด / ไข่วันนี้ / แนวโน้ม / รายงาน)
-            _buildAnalysisFilter(),
+      body: RepaintBoundary(
+        key: _captureKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ✅ FILTER (ทั้งหมด / ไข่วันนี้ / แนวโน้ม / รายงาน)
+              _buildAnalysisFilter(),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // 📈 CARD 1
-            if (selectedFilter == 'ทั้งหมด' || selectedFilter == 'ไข่วันนี้')
-              FutureBuilder<Map<String, int>>(
-                future: EggDatabase.instance.getTodayEggSummary(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
+              // 📈 CARD 1
+              if (selectedFilter == 'ทั้งหมด' || selectedFilter == 'ไข่วันนี้')
+                FutureBuilder<Map<String, int>>(
+                  future: EggDatabase.instance.getTodayEggSummary(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return _resultCard(
+                        title: 'ผลการวิเคราะห์จำนวนไข่ตามเบอร์',
+                        subtitle: 'จำนวนไข่ตามเบอร์ (ประจำวัน)',
+                      );
+                    }
+
+                    final data = snapshot.data!;
                     return _resultCard(
                       title: 'ผลการวิเคราะห์จำนวนไข่ตามเบอร์',
                       subtitle: 'จำนวนไข่ตามเบอร์ (ประจำวัน)',
+                      chart: TodayEggDonutChart(
+                        big: data['big'] ?? 0,
+                        medium: data['medium'] ?? 0,
+                        small: data['small'] ?? 0,
+                      ),
                     );
-                  }
+                  },
+                ),
 
-                  final data = snapshot.data!;
-                  return _resultCard(
-                    title: 'ผลการวิเคราะห์จำนวนไข่ตามเบอร์',
-                    subtitle: 'จำนวนไข่ตามเบอร์ (ประจำวัน)',
-                    chart: TodayEggDonutChart(
-                      big: data['big'] ?? 0,
-                      medium: data['medium'] ?? 0,
-                      small: data['small'] ?? 0,
-                    ),
-                  );
-                },
-              ),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 16),
+              // 📉 CARD 2
+              if (selectedFilter == 'ทั้งหมด' ||
+                  selectedFilter == 'แนวโน้มผลผลิต')
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: EggDatabase.instance.getWeeklyTrend(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return _resultCard(
+                        title: 'ผลการวิเคราะห์แนวโน้ม',
+                        subtitle: 'แนวโน้มผลผลิตไข่',
+                      );
+                    }
 
-            // 📉 CARD 2
-            if (selectedFilter == 'ทั้งหมด' ||
-                selectedFilter == 'แนวโน้มผลผลิต')
-              FutureBuilder<List<Map<String, dynamic>>>(
-                future: EggDatabase.instance.getWeeklyTrend(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
                     return _resultCard(
                       title: 'ผลการวิเคราะห์แนวโน้ม',
                       subtitle: 'แนวโน้มผลผลิตไข่',
+                      chart: EggTrendLineChart(data: snapshot.data!),
                     );
-                  }
+                  },
+                ),
 
-                  return _resultCard(
-                    title: 'ผลการวิเคราะห์แนวโน้ม',
-                    subtitle: 'แนวโน้มผลผลิตไข่',
-                    chart: EggTrendLineChart(data: snapshot.data!),
-                  );
-                },
-              ),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 16),
+              // 📉 CARD 3
+              if (selectedFilter == 'ทั้งหมด' ||
+                  selectedFilter == 'รายงานสรุปผล')
+                FutureBuilder<Map<String, dynamic>>(
+                  future: EggDatabase.instance.getSummaryReport(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return _resultCard(
+                        title: 'รายงานสรุปผล',
+                        subtitle: 'สรุปผลการวิเคราะห์',
+                      );
+                    }
 
-            // 📉 CARD 3
-            if (selectedFilter == 'ทั้งหมด' || selectedFilter == 'รายงานสรุปผล')
-              FutureBuilder<Map<String, dynamic>>(
-                future: EggDatabase.instance.getSummaryReport(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
+                    final data = snapshot.data!;
                     return _resultCard(
                       title: 'รายงานสรุปผล',
                       subtitle: 'สรุปผลการวิเคราะห์',
+                      chart: SummaryReportCard(
+                        totalEgg: (data['totalEgg'] ?? 0).toInt(),
+                        avgSuccess: (data['avgSuccess'] ?? 0).toDouble(),
+                        big: (data['big'] ?? 0).toInt(),
+                        medium: (data['medium'] ?? 0).toInt(),
+                        small: (data['small'] ?? 0).toInt(),
+                      ),
                     );
-                  }
+                  },
+                ),
+              const SizedBox(height: 14),
 
-                  final data = snapshot.data!;
-                  return _resultCard(
-                    title: 'รายงานสรุปผล',
-                    subtitle: 'สรุปผลการวิเคราะห์',
-                    chart: SummaryReportCard(
-                      totalEgg: (data['totalEgg'] ?? 0).toInt(),
-                      avgSuccess: (data['avgSuccess'] ?? 0).toDouble(),
-                      big: (data['big'] ?? 0).toInt(),
-                      medium: (data['medium'] ?? 0).toInt(),
-                      small: (data['small'] ?? 0).toInt(),
+              /// 🔴 NEW SESSION BUTTON
+              SizedBox(
+                width: 80,
+                child: OutlinedButton.icon(
+                  icon: const Icon(
+                    Icons.restart_alt,
+                    color: Colors.white,
+                  ),
+                  label: const Text(
+                    'New',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  );
-                },
-              ),
-          ],
+                    side: BorderSide.none, // ❌ ไม่มีเส้นขอบ
+                  ),
+                  onPressed: _confirmNewSession,
+                ),
+              )
+            ],
+          ),
         ),
       ),
 
       // 📸 Floating Camera Button
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFFFFC107),
-        child: const Icon(Icons.camera_alt, color: Colors.black),
-        onPressed: () {
-          Navigator.pushNamed(context, '/camera');
-        },
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: 'capture',
+            backgroundColor: Colors.green,
+            child: const Icon(Icons.save),
+            onPressed: _captureAndSave,
+          ),
+          const SizedBox(width: 12),
+          FloatingActionButton.extended(
+            heroTag: 'addEgg',
+            backgroundColor: const Color(0xFFFFC107),
+            icon: const Icon(Icons.add, color: Colors.black),
+            label: const Text('เพิ่มข้อมูล',
+                style: TextStyle(color: Colors.black)),
+            onPressed: () => _showAddEggDialog(),
+          ),
+          const SizedBox(width: 12),
+          FloatingActionButton(
+            heroTag: 'camera',
+            backgroundColor: const Color(0xFFFFC107),
+            child: const Icon(Icons.camera_alt, color: Colors.black),
+            onPressed: () {
+              Navigator.pushNamed(context, '/camera');
+            },
+          ),
+        ],
       ),
 
       // ⬇️ Bottom Navigation

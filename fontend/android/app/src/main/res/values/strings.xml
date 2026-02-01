@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NumberEgg</string>
+    <string name="app_description">Smart egg detection and measurement using AI</string>
+    
+    <!-- Permission related strings -->
+    <string name="camera_permission_required">Camera permission is required for egg detection</string>
+    <string name="storage_permission_required">Storage permission is required to save images</string>
+    <string name="permission_denied">Permission denied. Please enable permissions in settings.</string>
+    
+    <!-- Error messages -->
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="error_server">Server error. Please try again later.</string>
+    <string name="error_detection">Detection failed. Please try again.</string>
+    
+    <!-- Success messages -->
+    <string name="detection_complete">Detection completed successfully</string>
+    <string name="image_saved">Image saved successfully</string>
+    
+    <!-- General UI strings -->
+    <string name="detect_eggs">Detect Eggs</string>
+    <string name="take_photo">Take Photo</string>
+    <string name="select_image">Select Image</string>
+    <string name="results">Results</string>
+    <string name="history">History</string>
+    <string name="profile">Profile</string>
+    <string name="settings">Settings</string>
+    
+    <!-- Egg classification -->
+    <string name="big_eggs">Big Eggs</string>
+    <string name="medium_eggs">Medium Eggs</string>
+    <string name="small_eggs">Small Eggs</string>
+    <string name="total_eggs">Total Eggs</string>
+    <string name="accuracy">Accuracy</string>
+    
+    <!-- Training related -->
+    <string name="train_model">Train Model</string>
+    <string name="upload_training_data">Upload Training Data</string>
+    <string name="training_progress">Training Progress</string>
+    <string name="training_complete">Training Complete</string>
+</resources>

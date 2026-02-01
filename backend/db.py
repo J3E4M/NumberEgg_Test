@@ -63,6 +63,7 @@ def init_db():
     cur.execute("""
         CREATE TABLE egg_session (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             image_path TEXT NOT NULL,
             egg_count INTEGER NOT NULL,
             success_percent REAL NOT NULL,
@@ -70,7 +71,8 @@ def init_db():
             medium_count INTEGER NOT NULL,
             small_count INTEGER NOT NULL,
             day TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
 
@@ -320,16 +322,16 @@ def search_users(keyword):
 
 
 # Egg Session CRUD functions
-def insert_egg_session(image_path, egg_count, success_percent, big_count, medium_count, small_count, day):
+def insert_egg_session(user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day):
     """เพิ่มข้อมูล egg session ใหม่"""
     from datetime import datetime
     conn = get_connection()
     cur = conn.cursor()
     now = datetime.now().isoformat()
     cur.execute("""
-        INSERT INTO egg_session (image_path, egg_count, success_percent, big_count, medium_count, small_count, day, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (image_path, egg_count, success_percent, big_count, medium_count, small_count, day, now))
+        INSERT INTO egg_session (user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, now))
     conn.commit()
     session_id = cur.lastrowid
     conn.close()
@@ -346,6 +348,16 @@ def get_egg_sessions():
     return sessions
 
 
+def get_egg_sessions_by_user(user_id):
+    """ดึงข้อมูล egg sessions ตาม user_id"""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM egg_session WHERE user_id = ? ORDER BY created_at DESC", (user_id,))
+    sessions = cur.fetchall()
+    conn.close()
+    return sessions
+
+
 def get_egg_session_by_id(session_id):
     """ดึงข้อมูล egg session ตาม id"""
     conn = get_connection()
@@ -356,7 +368,7 @@ def get_egg_session_by_id(session_id):
     return session
 
 
-def update_egg_session(session_id, image_path=None, egg_count=None, success_percent=None, big_count=None, medium_count=None, small_count=None, day=None):
+def update_egg_session(session_id, user_id=None, image_path=None, egg_count=None, success_percent=None, big_count=None, medium_count=None, small_count=None, day=None):
     """อัพเดทข้อมูล egg session"""
     from datetime import datetime
     conn = get_connection()
@@ -365,6 +377,9 @@ def update_egg_session(session_id, image_path=None, egg_count=None, success_perc
     fields = []
     values = []
     
+    if user_id is not None:
+        fields.append("user_id = ?")
+        values.append(user_id)
     if image_path is not None:
         fields.append("image_path = ?")
         values.append(image_path)
@@ -508,7 +523,7 @@ def delete_egg_items_by_session(session_id):
 
 
 # Special functions for egg management
-def add_egg_with_quantities(image_path, egg_count, success_percent, big_count, medium_count, small_count, day, egg_items_data):
+def add_egg_with_quantities(user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, egg_items_data):
     """เพิ่มข้อมูล session พร้อม egg items พร้อมกัน"""
     from datetime import datetime
     conn = get_connection()
@@ -518,9 +533,9 @@ def add_egg_with_quantities(image_path, egg_count, success_percent, big_count, m
         # Insert session
         now = datetime.now().isoformat()
         cur.execute("""
-            INSERT INTO egg_session (image_path, egg_count, success_percent, big_count, medium_count, small_count, day, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (image_path, egg_count, success_percent, big_count, medium_count, small_count, day, now))
+            INSERT INTO egg_session (user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, now))
         
         session_id = cur.lastrowid
         

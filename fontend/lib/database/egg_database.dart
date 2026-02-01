@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -18,12 +19,17 @@ class EggDatabase {
   }
 
   Future<Database> _initDB() async {
+    // Initialize database factory for web
+    if (kIsWeb) {
+      databaseFactory = databaseFactoryFfi;
+    }
+    
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'egg.db');
 
     return await openDatabase(
       path,
-      version: 4, // ⭐ เพิ่ม version สำหรับ bounding box coordinates
+      version: 5, // ⭐ เพิ่ม version สำหรับ user_id column
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -33,6 +39,7 @@ class EggDatabase {
     await db.execute('''
     CREATE TABLE egg_session (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
       image_path TEXT NOT NULL,
       egg_count INTEGER NOT NULL,
       success_percent REAL NOT NULL,
@@ -78,18 +85,17 @@ class EggDatabase {
       )
     ''');
     }
-    
-    if (oldVersion < 4) {
-      // Add bounding box columns to egg_item table
-      await db.execute('ALTER TABLE egg_item ADD COLUMN x1 REAL NOT NULL DEFAULT 0.0');
-      await db.execute('ALTER TABLE egg_item ADD COLUMN y1 REAL NOT NULL DEFAULT 0.0');
-      await db.execute('ALTER TABLE egg_item ADD COLUMN x2 REAL NOT NULL DEFAULT 0.0');
-      await db.execute('ALTER TABLE egg_item ADD COLUMN y2 REAL NOT NULL DEFAULT 0.0');
+
+    if (oldVersion < 5) {
+      // Add user_id column to egg_session table
+      await db.execute(
+          'ALTER TABLE egg_session ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1');
     }
   }
 
   // ✅ INSERT SESSION
   Future<int> insertSession({
+    required int userId,
     required String imagePath,
     required int eggCount,
     required double successPercent,
@@ -103,6 +109,7 @@ class EggDatabase {
     final sessionId = await db.insert(
       'egg_session',
       {
+        'user_id': userId,
         'image_path': imagePath,
         'egg_count': eggCount,
         'success_percent': successPercent,
@@ -170,7 +177,8 @@ class EggDatabase {
 
   Future<int> deleteEggItemsBySession(int sessionId) async {
     final db = await database;
-    return await db.delete('egg_item', where: 'session_id = ?', whereArgs: [sessionId]);
+    return await db
+        .delete('egg_item', where: 'session_id = ?', whereArgs: [sessionId]);
   }
 
   // READ HISTORY
@@ -302,5 +310,10 @@ class EggDatabase {
     } catch (e) {
       throw Exception('Error clearing egg data: $e');
     }
+  }
+
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('egg_session');
   }
 }

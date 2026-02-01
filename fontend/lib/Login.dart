@@ -2,8 +2,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database/user_database.dart';
-import 'models/user.dart';
+import 'models/user.dart' as app_user;
+import 'config/supabase_config.dart';
+import 'services/supabase_service.dart';
 
 Logger log = Logger();
 
@@ -39,51 +42,30 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      // ตรวจสอบว่าเป็น mock user หรือไม่ก่อน
-      final prefs = await SharedPreferences.getInstance();
-      final isMockRegistered = prefs.getBool('mock_registered') ?? false;
+      debugPrint('🔍 พยายามเข้าสู่ระบบด้วย: ${_emailController.text.trim()}');
       
-      if (isMockRegistered) {
-        final savedEmail = prefs.getString('mock_email');
-        final savedPassword = prefs.getString('mock_password');
-        final savedName = prefs.getString('mock_name');
-        
-        if (_emailController.text.trim() == savedEmail && _passwordController.text == savedPassword) {
-          // Login สำเร็จแบบ mock
-          await prefs.setBool('is_logged_in', true);
-          await prefs.setString('user_email', savedEmail!);
-          await prefs.setString('user_name', savedName!);
-          await prefs.setString('user_privilege', 'User');
-          
-          // บันทึกการจดจำข้อมูลการเข้าสู่ระบบ
-          await _saveCredentials();
-          
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, '/member');
-          }
-          return;
-        } else {
-          setState(() => _errorMessage = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-          return;
-        }
+      // ตรวจสอบว่าเชื่อมต่อ Supabase ได้หรือไม่
+      if (!SupabaseConfig.isConfigured) {
+        throw Exception('Supabase ยังไม่ได้ตั้งค่า');
       }
       
-      // ใช้ UserDatabase สำหรับการตรวจสอบการเข้าสู่ระบบ
-      final loginResult = await UserDatabase.login(
+      // ใช้ SupabaseService สำหรับการเข้าสู่ระบบ
+      final loginResult = await SupabaseService.login(
         _emailController.text.trim(),
         _passwordController.text,
       );
 
       if (loginResult != null) {
-        final user = loginResult['user'] as User;
+        debugPrint('✅ เข้าสู่ระบบสำเร็จ: ${loginResult['name']}');
+        
         final prefs = await SharedPreferences.getInstance();
         
         // บันทึกข้อมูลการเข้าสู่ระบบ
         await prefs.setBool('is_logged_in', true);
-        await prefs.setInt('user_id', user.id);
-        await prefs.setString('user_email', user.email);
-        await prefs.setString('user_name', user.name);
-        await prefs.setString('user_privilege', user.privilegeNameDisplay);
+        await prefs.setInt('user_id', loginResult['id']);
+        await prefs.setString('user_email', loginResult['email']);
+        await prefs.setString('user_name', loginResult['name']);
+        await prefs.setString('user_privilege', loginResult['privileges']['name'] ?? 'User');
         
         // บันทึกการจดจำข้อมูลการเข้าสู่ระบบ
         await _saveCredentials();
@@ -95,24 +77,32 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _errorMessage = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
       }
     } catch (e) {
-      // ถ้าเกิด connection error ให้ตรวจสอบว่ามี mock user หรือไม่
-      if (e.toString().contains('Connection refused') || 
-          e.toString().contains('SocketException')) {
+      debugPrint('❌ เข้าสู่ระบบล้มเหลว: $e');
+      
+      // ถ้าเป็น connection error ให้ลองใช้ UserDatabase แบบเก่า (fallback)
+      if (e.toString().contains('Connection') || 
+          e.toString().contains('Network') ||
+          e.toString().contains('Supabase') ||
+          !SupabaseConfig.isConfigured) {
         
-        final prefs = await SharedPreferences.getInstance();
-        final isMockRegistered = prefs.getBool('mock_registered') ?? false;
+        debugPrint('🔄 ลอง fallback ไปใช้ UserDatabase แบบเก่า');
         
-        if (isMockRegistered) {
-          final savedEmail = prefs.getString('mock_email');
-          final savedPassword = prefs.getString('mock_password');
-          final savedName = prefs.getString('mock_name');
-          
-          if (_emailController.text.trim() == savedEmail && _passwordController.text == savedPassword) {
-            // Login สำเร็จแบบ mock
+        try {
+          final loginResult = await UserDatabase.login(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
+
+          if (loginResult != null) {
+            final user = loginResult['user'] as app_user.User;
+            final prefs = await SharedPreferences.getInstance();
+            
+            // บันทึกข้อมูลการเข้าสู่ระบบ
             await prefs.setBool('is_logged_in', true);
-            await prefs.setString('user_email', savedEmail!);
-            await prefs.setString('user_name', savedName!);
-            await prefs.setString('user_privilege', 'User');
+            await prefs.setInt('user_id', user.id);
+            await prefs.setString('user_email', user.email);
+            await prefs.setString('user_name', user.name);
+            await prefs.setString('user_privilege', user.privilegeNameDisplay);
             
             // บันทึกการจดจำข้อมูลการเข้าสู่ระบบ
             await _saveCredentials();
@@ -120,11 +110,13 @@ class _LoginPageState extends State<LoginPage> {
             if (mounted) {
               Navigator.pushReplacementNamed(context, '/member');
             }
-            return;
+          } else {
+            setState(() => _errorMessage = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
           }
+        } catch (fallbackError) {
+          debugPrint('❌ Fallback ก็ล้มเหลว: $fallbackError');
+          setState(() => _errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nกรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
         }
-        
-        setState(() => _errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nกรุณาเปิดเซิร์ฟเวอร์หรือสมัครสมาชิกในโหมดทดสอบ');
       } else {
         setState(() => _errorMessage = 'เกิดข้อผิดพลาด: ${e.toString()}');
       }
@@ -319,10 +311,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                           activeColor: const Color(0xFFFFC107),
                         ),
-                        const Text(
-                          'จดจำการเข้าระบบ',
-                          style: TextStyle(fontSize: 14),
-                        ),
+                        const Text('จดจำการเข้าระบบ'),
                       ],
                     ),
                     

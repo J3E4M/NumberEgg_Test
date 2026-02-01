@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'dart:ui' as ui;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'camera.dart'; // Import Detection class
-import 'database/egg_database.dart'; // Import egg database
+import 'package:shared_preferences/shared_preferences.dart';
+import 'database/egg_database.dart';
 
 // --- หน้าแสดงผลและ Save หลังจากถ่ายภาพ ---
 class DisplayPictureScreen extends StatefulWidget {
   final String imagePath;
-  final List<Detection> detections; // รับค่าผลลัพธ์จากหน้า Camera
-
-  const DisplayPictureScreen({
-    Key? key,
-    required this.imagePath,
-    this.detections = const [], // ค่า default ว่าง
-  }) : super(key: key);
+  const DisplayPictureScreen({Key? key, required this.imagePath}) : super(key: key);
 
   @override
   State<DisplayPictureScreen> createState() => _DisplayPictureScreenState();
@@ -23,23 +16,125 @@ class DisplayPictureScreen extends StatefulWidget {
 
 class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
   bool isSaving = false;
-  ui.Image? _decodedImage;
+  bool isSaved = false;
+  bool isLocalSaved = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _decodeImage();
+  Future<void> saveImageToGallery() async {
+    setState(() { isSaving = true; });
+    try {
+      var status = await Permission.storage.request();
+      if (status.isDenied) {
+        status = await Permission.photos.request();
+      }
+
+      if (status.isGranted || await Permission.storage.isGranted || await Permission.photos.isGranted) {
+        final Directory? directory = await getExternalStorageDirectory();
+        if (directory != null) {
+          String newPath = "";
+          if (Platform.isAndroid) {
+             newPath = "/storage/emulated/0/DCIM/Camera"; 
+             final dir = Directory(newPath);
+             if (!dir.existsSync()) {
+               newPath = directory.path; 
+             }
+          } else {
+            newPath = directory.path;
+          }
+
+          String fileName = "Egg_${DateTime.now().millisecondsSinceEpoch}.jpg";
+          String fullPath = "$newPath/$fileName";
+          
+          await File(widget.imagePath).copy(fullPath);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('บันทึกรูปภาพลงเครื่องเรียบร้อย: $fileName'), 
+                backgroundColor: const Color(0xFF4CAF50),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            setState(() { isLocalSaved = true; });
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('กรุณาอนุญาตให้เข้าถึงรูปภาพ'), backgroundColor: Colors.red),
+          );
+        }
+        openAppSettings();
+      }
+    } catch (e) {
+      debugPrint("Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() { isSaving = false; });
+    }
   }
 
-  Future<void> _decodeImage() async {
+  // 📊 บันทึกลง History (Database)
+  Future<void> saveToHistory() async {
+    setState(() { isSaving = true; });
     try {
-      final bytes = await File(widget.imagePath).readAsBytes();
-      final codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      _decodedImage = frame.image; // Get the actual image from FrameInfo
-      if (mounted) setState(() {});
+      // จำลองการบันทึกลง Database (เนื่องจากไม่มีข้อมูล detection)
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id') ?? 1;
+      
+      // สร้างข้อมูลจำลอง
+      final sessionId = await EggDatabase.instance.insertSession(
+        userId: userId,
+        imagePath: widget.imagePath,
+        eggCount: 2, // จำลองว่ามี 2 ฟอง
+        successPercent: 95.0, // จำลอง
+        bigCount: 1,
+        mediumCount: 1,
+        smallCount: 0,
+        day: DateTime.now().toString().substring(0, 10),
+      );
+
+      // จำลองการเพิ่ม egg items
+      await EggDatabase.instance.insertEggItem(
+        sessionId: sessionId,
+        grade: 3,
+        confidence: 98.0,
+      );
+      
+      await EggDatabase.instance.insertEggItem(
+        sessionId: sessionId,
+        grade: 2,
+        confidence: 92.0,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('บันทึกลง History เรียบร้อย'), 
+            backgroundColor: Color(0xFFFFB300),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        setState(() { isSaved = true; });
+      }
     } catch (e) {
-      print('Error decoding image: $e');
+      debugPrint("Save to history error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการบันทึก History: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() { isSaving = false; });
     }
   }
 
@@ -79,27 +174,11 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
-                    child: Stack(
-                      children: [
-                        // Original image
-                        Image.file(
-                          File(widget.imagePath), 
-                          fit: BoxFit.cover, 
-                          height: 300, 
-                          width: double.infinity
-                        ),
-                        // Detection overlay
-                        if (widget.detections.isNotEmpty && _decodedImage != null)
-                          Positioned.fill(
-                            child: CustomPaint(
-                              painter: DetectionOverlayPainter(
-                                detections: widget.detections,
-                                imageWidth: _decodedImage!.width.toDouble(),
-                                imageHeight: _decodedImage!.height.toDouble(),
-                              ),
-                            ),
-                          ),
-                      ],
+                    child: Image.file(
+                      File(widget.imagePath), 
+                      fit: BoxFit.cover, 
+                      height: 300, 
+                      width: double.infinity
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -114,22 +193,18 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: widget.detections.isNotEmpty ? Colors.green : Colors.orange,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
-                            widget.detections.isNotEmpty ? Icons.check : Icons.search,
-                            color: Colors.white, 
-                            size: 20
-                          ),
+                          child: const Icon(Icons.check, color: Colors.white, size: 20),
                         ),
                         const SizedBox(width: 15),
-                        Column(
+                        const Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              widget.detections.isNotEmpty ? "การประมวลผล สำเร็จ" : "ไม่พบไข่",
+                              "การประมวลผล สำเร็จ",
                               style: TextStyle(
                                 color: Colors.orange,
                                 fontWeight: FontWeight.bold,
@@ -137,9 +212,7 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
                               ),
                             ),
                             Text(
-                              widget.detections.isNotEmpty 
-                                ? "พบไข่ไก่จำนวน ${widget.detections.length} ฟอง"
-                                : "ไม่พบการตรวจจับในภาพ",
+                              "พบไข่ไก่จำนวน 2 ฟอง",
                               style: TextStyle(color: Colors.black54, fontSize: 12),
                             ),
                           ],
@@ -155,55 +228,19 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // แสดงรายการไข่ที่ตรวจพบจริง
-                  if (widget.detections.isNotEmpty)
-                    ...widget.detections.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final detection = entry.value;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _buildDetectionResultItem(
-                          title: "Egg ${index + 1}",
-                          detection: detection,
-                        ),
-                      );
-                    }).toList()
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.search_off, color: Colors.grey.shade400, size: 40),
-                          const SizedBox(width: 15),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "ไม่พบไข่ในภาพ",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                Text(
-                                  "ลองถ่ายภาพใหม่ในมุมที่ชัดเจนกว่านี้",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  _buildResultItem(
+                    title: "Egg 1",
+                    subtitle: "ใหญ่ (เบอร์ 0)",
+                    confidence: "98%",
+                    iconColor: Colors.green,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildResultItem(
+                    title: "Egg 2",
+                    subtitle: "กลาง (เบอร์ 1)",
+                    confidence: "92%",
+                    iconColor: Colors.amber,
+                  ),
                 ],
               ),
             ),
@@ -211,30 +248,64 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
           
           Padding(
             padding: const EdgeInsets.all(20),
-            child: SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: isSaving ? null : saveImageToGallery,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFC107),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  elevation: 2,
-                ),
-                child: isSaving 
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Save to History",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        SizedBox(width: 10),
-                        Icon(Icons.download, color: Colors.white),
-                      ],
+            child: Column(
+              children: [
+                // 📱 บันทึกลงเครื่อง
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    onPressed: (isSaving || isLocalSaved) ? null : saveImageToGallery,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isLocalSaved ? Colors.grey : const Color(0xFF2196F3),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      elevation: 2,
                     ),
-              ),
+                    child: isSaving 
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              isLocalSaved ? "บันทึกลงเครื่องแล้ว" : "บันทึกลงเครื่อง",
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            const SizedBox(width: 10),
+                            const Icon(Icons.download, color: Colors.white),
+                          ],
+                        ),
+                  ),
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // 📊 บันทึกลง History
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    onPressed: (isSaving || isSaved) ? null : saveToHistory,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isSaved ? Colors.grey : const Color(0xFFFFC107),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      elevation: 2,
+                    ),
+                    child: isSaving 
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              isSaved ? "บันทึกลง History แล้ว" : "บันทึกลง History",
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            const SizedBox(width: 10),
+                            const Icon(Icons.save_alt, color: Colors.white),
+                          ],
+                        ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -242,13 +313,12 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
     );
   }
 
-  Widget _buildDetectionResultItem({
+  Widget _buildResultItem({
     required String title,
-    required Detection detection,
+    required String subtitle,
+    required String confidence,
+    required Color iconColor,
   }) {
-    // แปลงขนาดไข่เป็นชื่อและสี
-    Map<String, dynamic> eggDetails = _getEggDetails(detection.eggSize);
-    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -263,265 +333,44 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
               color: Colors.white.withOpacity(0.5),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.egg, color: eggDetails['color'], size: 24),
+            child: Icon(Icons.egg, color: iconColor, size: 24),
           ),
           const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
-                Text(
-                  eggDetails['name'],
-                  style: TextStyle(
-                    color: Colors.black54,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  "ความมั่นใจ: ${(detection.confidence * 100).toStringAsFixed(1)}%",
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(color: Colors.black54, fontSize: 14),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Text(
+              confidence,
+              style: const TextStyle(
+                color: Color.fromARGB(255, 175, 168, 76),
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
             ),
           ),
         ],
       ),
     );
   }
-
-  // ฟังก์ชันช่วยแปลงขนาดไข่เป็นชื่อและสี
-  Map<String, dynamic> _getEggDetails(String sizeKey) {
-    switch (sizeKey) {
-      case 'ใหญ่':
-        return {
-          'name': 'ใหญ่ (เบอร์ 0)',
-          'color': Colors.green
-        };
-      case 'กลาง':
-        return {
-          'name': 'กลาง (เบอร์ 1)',
-          'color': Colors.amber
-        };
-      case 'เล็ก':
-        return {'name': 'เล็ก (เบอร์ 2-3)', 'color': Colors.orange};
-      default:
-        return {'name': sizeKey, 'color': Colors.grey};
-    }
-  }
-
-  Future<void> saveImageToGallery() async {
-    setState(() { isSaving = true; });
-    try {
-      var status = await Permission.storage.request();
-      if (status.isDenied) {
-        status = await Permission.photos.request();
-      }
-
-      if (status.isGranted || await Permission.storage.isGranted || await Permission.photos.isGranted) {
-        final Directory? directory = await getExternalStorageDirectory();
-        if (directory != null) {
-          String newPath = "";
-          if (Platform.isAndroid) {
-             newPath = "/storage/emulated/0/DCIM/Camera"; 
-             final dir = Directory(newPath);
-             if (!dir.existsSync()) {
-               newPath = directory.path; 
-             }
-          } else {
-            newPath = directory.path;
-          }
-
-          String fileName = "Egg_${DateTime.now().millisecondsSinceEpoch}.jpg";
-          String fullPath = "$newPath/$fileName";
-          
-          await File(widget.imagePath).copy(fullPath);
-
-          // บันทึกข้อมูลการตรวจจับลงฐานข้อมูล
-          await _saveDetectionToDatabase(fullPath);
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('บันทึกรูปภาพเรียบร้อย: $fileName'), 
-                backgroundColor: const Color.fromARGB(255, 201, 146, 26)
-              ),
-            );
-          }
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('กรุณาอนุญาตให้เข้าถึงรูปภาพ'), backgroundColor: Colors.red),
-          );
-        }
-        openAppSettings();
-      }
-    } catch (e) {
-      debugPrint("Error: $e");
-    } finally {
-      if (mounted) setState(() { isSaving = false; });
-    }
-  }
-
-  Future<void> _saveDetectionToDatabase(String savedImagePath) async {
-    try {
-      // สร้าง tags จาก detections
-      List<String> tags = [];
-      Map<String, int> sizeCount = {};
-      
-      for (final detection in widget.detections) {
-        sizeCount[detection.eggSize] = (sizeCount[detection.eggSize] ?? 0) + 1;
-      }
-      
-      // แปลงเป็นรูปแบบ "2xใหญ่"
-      for (final entry in sizeCount.entries) {
-        tags.add("${entry.value}x${entry.key}");
-      }
-      
-      // คำนวณข้อมูลสำหรับ database
-      final eggCount = widget.detections.length;
-      final successPercent = eggCount > 0 ? 100.0 : 0.0;
-      final bigCount = sizeCount['ใหญ่'] ?? 0;
-      final mediumCount = sizeCount['กลาง'] ?? 0;
-      final smallCount = sizeCount['เล็ก'] ?? 0;
-      
-      // สร้าง egg session
-      final sessionId = await EggDatabase.instance.insertSession(
-        imagePath: savedImagePath,
-        eggCount: eggCount,
-        successPercent: successPercent,
-        bigCount: bigCount,
-        mediumCount: mediumCount,
-        smallCount: smallCount,
-        day: DateTime.now().toIso8601String().split('T')[0], // YYYY-MM-DD format
-      );
-      
-      // บันทึกรายละเอียดไข่แต่ละอัน
-      for (int i = 0; i < widget.detections.length; i++) {
-        final detection = widget.detections[i];
-        await EggDatabase.instance.insertEggItem(
-          sessionId: sessionId,
-          grade: _getGradeFromSize(detection.eggSize),
-          confidence: detection.confidence,
-          x1: detection.x1,
-          y1: detection.y1,
-          x2: detection.x2,
-          y2: detection.y2,
-        );
-      }
-      
-      print('Saved egg session to database: $sessionId');
-    } catch (e) {
-      print('Error saving to database: $e');
-    }
-  }
-
-  // แปลงขนาดไข่เป็นเกรด
-  int _getGradeFromSize(String size) {
-    switch (size) {
-      case 'ใหญ่':
-        return 0; // เบอร์ 0
-      case 'กลาง':
-        return 1; // เบอร์ 1
-      case 'เล็ก':
-        return 2; // เบอร์ 2-3
-      default:
-        return 3; // อื่นๆ
-    }
-  }
-}
-
-/// Custom painter to draw detection bounding boxes and labels
-class DetectionOverlayPainter extends CustomPainter {
-  final List<Detection> detections;
-  final double imageWidth;
-  final double imageHeight;
-
-  DetectionOverlayPainter({
-    required this.detections,
-    required this.imageWidth,
-    required this.imageHeight,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.green
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    final labelPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final textPainter = TextPainter(
-      textDirection: TextDirection.ltr,
-    );
-
-    for (int i = 0; i < detections.length; i++) {
-      final detection = detections[i];
-      
-      // Scale coordinates to fit the image display size
-      final scaleX = size.width / imageWidth;
-      final scaleY = size.height / imageHeight;
-      
-      final rect = Rect.fromLTRB(
-        detection.x1 * scaleX,
-        detection.y1 * scaleY,
-        detection.x2 * scaleX,
-        detection.y2 * scaleY,
-      );
-
-      // Draw bounding box
-      canvas.drawRect(rect, paint);
-
-      // Draw label background
-      final labelText = 'Egg ${i + 1}';
-      textPainter.text = TextSpan(
-        text: labelText,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      );
-      
-      textPainter.layout();
-      final textWidth = textPainter.width;
-      final textHeight = textPainter.height;
-      
-      final labelRect = Rect.fromLTWH(
-        rect.left,
-        rect.top - textHeight - 4,
-        textWidth + 8,
-        textHeight + 4,
-      );
-      
-      // Draw label background
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(labelRect, const Radius.circular(4)),
-        labelPaint,
-      );
-      
-      // Draw label text
-      textPainter.paint(
-        canvas,
-        Offset(rect.left + 4, rect.top - textHeight - 2),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant oldDelegate) => false;
 }

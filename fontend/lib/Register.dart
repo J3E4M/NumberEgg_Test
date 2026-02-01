@@ -2,7 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database/user_database.dart';
+import 'config/supabase_config.dart';
+import 'services/supabase_service.dart';
 
 Logger log = Logger();
 
@@ -52,87 +55,72 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      // ตรวจสอบว่าอีเมลซ้ำหรือไม่ (optional - ถ้าเกิด error จะข้ามไปได้)
+      debugPrint('🔍 พยายามสมัครสมาชิก: $email');
+      
+      // ตรวจสอบว่าเชื่อมต่อ Supabase ได้หรือไม่
+      if (!SupabaseConfig.isConfigured) {
+        throw Exception('Supabase ยังไม่ได้ตั้งค่า');
+      }
+      
+      // ตรวจสอบว่าอีเมลซ้ำหรือไม่
       try {
-        final isEmailDuplicate = await UserDatabase.isEmailDuplicate(email);
-        if (isEmailDuplicate) {
+        final isEmailDuplicate = await SupabaseService.checkConnection();
+        if (!isEmailDuplicate) {
+          throw Exception('ไม่สามารถตรวจสอบการเชื่อมต่อได้');
+        }
+        
+        // ตรวจสอบอีเมลซ้ำจริงๆ
+        final existingUsers = await SupabaseService.getUsers();
+        final emailExists = existingUsers.any((user) => user['email'] == email);
+        
+        if (emailExists) {
           setState(() => _errorMessage = 'อีเมลนี้ถูกใช้งานแล้ว');
           return;
         }
       } catch (emailError) {
         debugPrint('Email check failed, proceeding with registration: $emailError');
-        // ถ้าตรวจสอบอีเมลล้มเหลว ให้ข้ามไปสมัครสมาชิกได้
       }
 
-      // สร้างผู้ใช้ใหม่ (ใช้ privilege level 1 สำหรับ user ทั่วไป)
+      // สร้างผู้ใช้ใหม่ด้วย SupabaseService
       try {
-        final result = await UserDatabase.createUser(
+        final result = await SupabaseService.createUser(
           email: email,
           password: password,
           name: name,
-          privilegeId: 1,
+          privilegeId: 2, // User privilege
         );
+        
+        debugPrint('✅ สมัครสมาชิกสำเร็จ: ${result['name']}');
+        
       } catch (createError) {
-        // ถ้าสร้างผู้ใช้ล้มเหลวเพราะ connection error ให้แสดง error ที่เป็นประโยชน์
-        if (createError.toString().contains('Connection refused') || 
-            createError.toString().contains('SocketException')) {
+        debugPrint('❌ Supabase registration failed: $createError');
+        
+        // ถ้า Supabase ล้มเหลว ลอง fallback ไปใช้ UserDatabase แบบเก่า
+        if (createError.toString().contains('Connection') || 
+            createError.toString().contains('Network') ||
+            createError.toString().contains('Supabase')) {
           
-          // แสดง dialog ให้เลือกว่าจะใช้ mock mode หรือไม่
-          if (mounted) {
-            final useMock = await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('เซิร์ฟเวอร์ไม่ตอบสนอง'),
-                content: const Text('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nคุณต้องการทดสอบระบบในโหมด Mock หรือไม่?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('ยกเลิก'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('ใช้ Mock Mode'),
-                  ),
-                ],
-              ),
+          debugPrint('🔄 ลอง fallback ไปใช้ UserDatabase แบบเก่า');
+          
+          try {
+            final result = await UserDatabase.createUser(
+              email: email,
+              password: password,
+              name: name,
+              privilegeId: 2,
             );
             
-            if (useMock == true) {
-              // บันทึกข้อมูลการสมัครแบบ mock ไว้ใน SharedPreferences
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('mock_email', email);
-              await prefs.setString('mock_name', name);
-              await prefs.setString('mock_password', password);
-              await prefs.setBool('mock_registered', true);
-              
-              // แสดง dialog สำเร็จ
-              if (mounted) {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('สมัครสมาชิกสำเร็จ (Mock Mode)'),
-                    content: const Text('บันทึกข้อมูลแบบทดสอบเรียบร้อยแล้ว\nสามารถใช้งานได้ในโหมดทดสอบ'),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context); // ปิด dialog
-                          Navigator.pushReplacementNamed(context, '/login'); // ไปหน้า login
-                        },
-                        child: const Text('ไปเข้าสู่ระบบ'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return;
-            }
+            debugPrint('✅ Fallback registration successful: ${result['name']}');
+            
+          } catch (fallbackError) {
+            debugPrint('❌ Fallback registration failed: $fallbackError');
+            setState(() => _errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่ภายหลัง');
+            return;
           }
-          
-          setState(() => _errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่ภายหลัง');
         } else {
           setState(() => _errorMessage = 'เกิดข้อผิดพลาดในการสมัครสมาชิก: ${createError.toString()}');
+          return;
         }
-        return;
       }
 
       if (mounted) {
@@ -155,6 +143,7 @@ class _RegisterPageState extends State<RegisterPage> {
         );
       }
     } catch (e) {
+      debugPrint('❌ Registration error: $e');
       setState(() => _errorMessage = 'เกิดข้อผิดพลาด: ${e.toString()}');
     } finally {
       if (mounted) {

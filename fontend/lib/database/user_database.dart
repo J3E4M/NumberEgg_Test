@@ -6,7 +6,8 @@ import '../models/privilege.dart';
 import '../utils/server_config.dart';
 
 class UserDatabase {
-  static const String baseUrl = 'http://10.0.2.2:8000'; // For emulator connection
+  // ใช้ ServerConfig แทน hardcoded URL
+  static String get baseUrl => ServerConfig.getSupabaseUrl();
 
   // ==================== PRIVILEGE CRUD ====================
   
