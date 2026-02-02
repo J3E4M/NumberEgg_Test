@@ -158,26 +158,44 @@ async def detect_eggs(
                     confidence = float(box.conf[0].cpu().numpy())
                     class_id = int(box.cls[0].cpu().numpy())
                     
-                    # Calculate egg size based on bounding box area
+                    # Filter for egg-like objects only
+                    # YOLOv8 class 0=person, 1=bicycle, 2=car, ..., 47=apple, 48=orange, 49=broccoli, 50=carrot
+                    # We'll filter by size and shape characteristics of eggs
                     width = x2 - x1
                     height = y2 - y1
                     area = width * height
+                    aspect_ratio = width / height
+                    
+                    # Egg detection filters:
+                    # 1. Minimum area (too small = noise)
+                    # 2. Maximum area (too large = not egg)
+                    # 3. Aspect ratio (eggs are typically oval, not too square or too long)
+                    # 4. Minimum confidence
+                    
+                    if confidence < 0.4:  # Low confidence filter
+                        continue
+                    
+                    if area < 3000 or area > 50000:  # Size filter
+                        continue
+                    
+                    if aspect_ratio < 0.4 or aspect_ratio > 2.5:  # Shape filter
+                        continue
                     
                     # Classify egg size into 6 grades (NEW SYSTEM - grade0-5)
-                    # TODO: calibrate with real-world scale
-                    if area >= 22000:
-                        egg_grade = "grade0"  # เบอร์ 0 (พิเศษ)
+                    # Based on bounding box area (calibrated for typical egg sizes)
+                    if area >= 25000:
+                        egg_grade = "grade0"  # เบอร์ 0 (พิเศษ) - ใหญ่พิเศษ
                         grade0_count += 1
                     elif area >= 20000:
                         egg_grade = "grade1"  # เบอร์ 1 (ใหญ่)
                         grade1_count += 1
-                    elif area >= 18000:
+                    elif area >= 16000:
                         egg_grade = "grade2"  # เบอร์ 2 (กลาง)
                         grade2_count += 1
-                    elif area >= 16000:
+                    elif area >= 12000:
                         egg_grade = "grade3"  # เบอร์ 3 (เล็ก)
                         grade3_count += 1
-                    elif area >= 14000:
+                    elif area >= 8000:
                         egg_grade = "grade4"  # เบอร์ 4 (เล็กมาก)
                         grade4_count += 1
                     else:
