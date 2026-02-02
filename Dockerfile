@@ -20,8 +20,8 @@ RUN pip install --no-cache-dir \
 # Copy app
 COPY railway_app_real.py .
 
-# Download YOLO ONNX model (smaller than .pt)
-RUN wget -O yolov8n.onnx https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.onnx
+# Download YOLO ONNX model from Hugging Face
+RUN wget -O yolov8n.onnx https://huggingface.co/ultralytics/YOLOv8/resolve/main/yolov8n.onnx
 
 # Create uploads
 RUN mkdir -p /app/uploads
