@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import os
 import tempfile
+import sqlite3
 from PIL import Image
 import base64
 import io
@@ -29,8 +30,10 @@ async def lifespan(app: FastAPI):
     try:
         global egg_detector
         egg_detector = RealEggDetector()
+        init_sqlite()
         init_supabase()
         print("✅ Real Egg Detector initialized successfully")
+        print("✅ SQLite initialized successfully")
         print("✅ Supabase connected successfully")
     except Exception as e:
         print(f"❌ Initialization failed: {e}")
@@ -55,6 +58,68 @@ egg_detector: Optional[RealEggDetector] = None
 # Create uploads directory
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+# SQLite configuration (local first)
+SQLITE_DB_PATH = Path("backend") / "database.db"
+
+def init_sqlite():
+    """Initialize SQLite database and tables"""
+    SQLITE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(SQLITE_DB_PATH))
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS egg_session (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            image_path TEXT NOT NULL,
+            egg_count INTEGER NOT NULL,
+            success_percent REAL NOT NULL,
+            grade0_count INTEGER NOT NULL,
+            grade1_count INTEGER NOT NULL,
+            grade2_count INTEGER NOT NULL,
+            grade3_count INTEGER NOT NULL,
+            grade4_count INTEGER NOT NULL,
+            grade5_count INTEGER NOT NULL,
+            day TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+def save_to_sqlite(payload: dict) -> int:
+    """Save egg session to SQLite and return session id"""
+    conn = sqlite3.connect(str(SQLITE_DB_PATH))
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO egg_session (
+            user_id, image_path, egg_count, success_percent,
+            grade0_count, grade1_count, grade2_count, grade3_count, grade4_count, grade5_count,
+            day, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            payload["user_id"],
+            payload["image_path"],
+            payload["egg_count"],
+            payload["success_percent"],
+            payload["grade0_count"],
+            payload["grade1_count"],
+            payload["grade2_count"],
+            payload["grade3_count"],
+            payload["grade4_count"],
+            payload["grade5_count"],
+            payload["day"],
+            payload["created_at"],
+        ),
+    )
+    conn.commit()
+    session_id = cur.lastrowid
+    conn.close()
+    return session_id
 
 def init_supabase():
     """Initialize Supabase client"""
@@ -133,26 +198,31 @@ async def detect_eggs(file: UploadFile = File(...), user_id: int = 1):
             })
         }
         
-        # Save to Supabase if available
+        payload = {
+            "user_id": user_id,
+            "image_path": detection_results["saved_path"],
+            "egg_count": detection_results["detection_results"]["total_eggs"],
+            "success_percent": detection_results["detection_results"]["success_percent"],
+            "grade0_count": detection_results["detection_results"]["grade0_count"],
+            "grade1_count": detection_results["detection_results"]["grade1_count"],
+            "grade2_count": detection_results["detection_results"]["grade2_count"],
+            "grade3_count": detection_results["detection_results"]["grade3_count"],
+            "grade4_count": detection_results["detection_results"]["grade4_count"],
+            "grade5_count": detection_results["detection_results"]["grade5_count"],
+            "day": datetime.now().strftime("%Y-%m-%d"),
+            # created_at ไม่ส่ง — ให้ Supabase ใช้ DEFAULT NOW()
+        }
+
+        sqlite_session_id = save_to_sqlite(payload)
+        print(f"✅ Saved to SQLite (egg_session) id: {sqlite_session_id}")
+
+        # Sync to Supabase if available
         if supabase:
             try:
-                supabase.table("egg_session").insert({
-                    "user_id": user_id,  # Use user_id from request
-                    "image_path": detection_results["saved_path"],
-                    "egg_count": detection_results["detection_results"]["total_eggs"],
-                    "success_percent": detection_results["detection_results"]["success_percent"],
-                    "grade0_count": detection_results["detection_results"]["grade0_count"],
-                    "grade1_count": detection_results["detection_results"]["grade1_count"],
-                    "grade2_count": detection_results["detection_results"]["grade2_count"],
-                    "grade3_count": detection_results["detection_results"]["grade3_count"],
-                    "grade4_count": detection_results["detection_results"]["grade4_count"],
-                    "grade5_count": detection_results["detection_results"]["grade5_count"],
-                    "day": datetime.now().strftime("%Y-%m-%d"),
-                    "created_at": datetime.now().isoformat()
-                }).execute()
-                print(f"✅ Saved to Supabase (egg_session) for user_id: {user_id}")
+                supabase.table("egg_session").insert(payload).execute()
+                print(f"✅ Synced to Supabase (egg_session) for user_id: {user_id}")
             except Exception as e:
-                print(f"❌ Supabase save failed: {e}")
+                print(f"❌ Supabase sync failed: {e}")
         
         return JSONResponse(content=detection_results)
         
