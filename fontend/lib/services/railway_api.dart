@@ -102,9 +102,12 @@ class EggDetectionResult {
   }
 
   int get eggCount => detectionResults.eggCount;
-  int get bigCount => detectionResults.bigCount;
-  int get mediumCount => detectionResults.mediumCount;
-  int get smallCount => detectionResults.smallCount;
+  int get grade0Count => detectionResults.grade0Count;
+  int get grade1Count => detectionResults.grade1Count;
+  int get grade2Count => detectionResults.grade2Count;
+  int get grade3Count => detectionResults.grade3Count;
+  int get grade4Count => detectionResults.grade4Count;
+  int get grade5Count => detectionResults.grade5Count;
   double get successPercent => detectionResults.successPercent;
   List<Detection> get detections => detectionResults.detections;
 }
@@ -134,17 +137,23 @@ class ImageInfo {
 
 class DetectionResults {
   final int eggCount;
-  final int bigCount;
-  final int mediumCount;
-  final int smallCount;
+  final int grade0Count;
+  final int grade1Count;
+  final int grade2Count;
+  final int grade3Count;
+  final int grade4Count;
+  final int grade5Count;
   final double successPercent;
   final List<Detection> detections;
 
   DetectionResults({
     required this.eggCount,
-    required this.bigCount,
-    required this.mediumCount,
-    required this.smallCount,
+    required this.grade0Count,
+    required this.grade1Count,
+    required this.grade2Count,
+    required this.grade3Count,
+    required this.grade4Count,
+    required this.grade5Count,
     required this.successPercent,
     required this.detections,
   });
@@ -159,9 +168,12 @@ class DetectionResults {
 
     return DetectionResults(
       eggCount: json['egg_count'] ?? 0,
-      bigCount: json['big_count'] ?? 0,
-      mediumCount: json['medium_count'] ?? 0,
-      smallCount: json['small_count'] ?? 0,
+      grade0Count: json['grade0_count'] ?? 0,
+      grade1Count: json['grade1_count'] ?? 0,
+      grade2Count: json['grade2_count'] ?? 0,
+      grade3Count: json['grade3_count'] ?? 0,
+      grade4Count: json['grade4_count'] ?? 0,
+      grade5Count: json['grade5_count'] ?? 0,
       successPercent: (json['success_percent'] ?? 0.0).toDouble(),
       detections: detectionsList,
     );

@@ -49,9 +49,12 @@ class EggSessionCreate(BaseModel):
     image_path: str
     egg_count: int
     success_percent: float
-    big_count: int
-    medium_count: int
-    small_count: int
+    grade0_count: int
+    grade1_count: int
+    grade2_count: int
+    grade3_count: int
+    grade4_count: int
+    grade5_count: int
     day: str
 
 class EggSessionUpdate(BaseModel):
@@ -59,9 +62,12 @@ class EggSessionUpdate(BaseModel):
     image_path: Optional[str] = None
     egg_count: Optional[int] = None
     success_percent: Optional[float] = None
-    big_count: Optional[int] = None
-    medium_count: Optional[int] = None
-    small_count: Optional[int] = None
+    grade0_count: Optional[int] = None
+    grade1_count: Optional[int] = None
+    grade2_count: Optional[int] = None
+    grade3_count: Optional[int] = None
+    grade4_count: Optional[int] = None
+    grade5_count: Optional[int] = None
     day: Optional[str] = None
 
 class EggItemCreate(BaseModel):
@@ -78,9 +84,12 @@ class EggSessionWithItems(BaseModel):
     image_path: str
     egg_count: int
     success_percent: float
-    big_count: int
-    medium_count: int
-    small_count: int
+    grade0_count: int
+    grade1_count: int
+    grade2_count: int
+    grade3_count: int
+    grade4_count: int
+    grade5_count: int
     day: str
     egg_items: list[dict]
 
@@ -482,9 +491,12 @@ async def create_egg_session(session: EggSessionCreate):
             image_path=session.image_path,
             egg_count=session.egg_count,
             success_percent=session.success_percent,
-            big_count=session.big_count,
-            medium_count=session.medium_count,
-            small_count=session.small_count,
+            grade0_count=session.grade0_count,
+            grade1_count=session.grade1_count,
+            grade2_count=session.grade2_count,
+            grade3_count=session.grade3_count,
+            grade4_count=session.grade4_count,
+            grade5_count=session.grade5_count,
             day=session.day
         )
         return {"id": session_id, "message": "Egg session created successfully"}
@@ -554,9 +566,12 @@ async def update_egg_session(session_id: int, session: EggSessionUpdate):
             image_path=session.image_path,
             egg_count=session.egg_count,
             success_percent=session.success_percent,
-            big_count=session.big_count,
-            medium_count=session.medium_count,
-            small_count=session.small_count,
+            grade0_count=session.grade0_count,
+            grade1_count=session.grade1_count,
+            grade2_count=session.grade2_count,
+            grade3_count=session.grade3_count,
+            grade4_count=session.grade4_count,
+            grade5_count=session.grade5_count,
             day=session.day
         )
         return {"message": "Egg session updated successfully"}
@@ -641,7 +656,7 @@ async def get_all_egg_items():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
+แก 
 @app.put("/egg-items/{item_id}")
 async def update_egg_item(item_id: int, item: EggItemUpdate):
     """อัพเดทข้อมูล egg item"""
@@ -698,9 +713,12 @@ async def add_egg_with_quantities(data: EggSessionWithItems):
             image_path=data.image_path,
             egg_count=data.egg_count,
             success_percent=data.success_percent,
-            big_count=data.big_count,
-            medium_count=data.medium_count,
-            small_count=data.small_count,
+            grade0_count=data.grade0_count,
+            grade1_count=data.grade1_count,
+            grade2_count=data.grade2_count,
+            grade3_count=data.grade3_count,
+            grade4_count=data.grade4_count,
+            grade5_count=data.grade5_count,
             day=data.day,
             egg_items_data=data.egg_items
         )

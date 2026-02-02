@@ -73,19 +73,19 @@ class _ResultPageState extends State<ResultPage> {
   // ฟังก์ชันช่วยแปลง ขนาด (เช่น "ใหญ่") เป็นชื่อเบอร์และสี
   // อัปเดตสีและชื่อให้ตรงกับภาพตัวอย่าง (Screenshot)
   Map<String, dynamic> _getEggDetails(String sizeKey) {
-    switch (sizeKey) {
-      case 'ใหญ่':
-        return {
-          'name': 'ใหญ่ (เบอร์ 0)',
-          'color': Colors.green // สีเขียวตามภาพตัวอย่าง
-        };
-      case 'กลาง':
-        return {
-          'name': 'กลาง (เบอร์ 1)',
-          'color': Colors.amber // สีเหลืองตามภาพตัวอย่าง
-        };
-      case 'เล็ก':
-        return {'name': 'เล็ก (เบอร์ 2-3)', 'color': Colors.orange};
+    switch (sizeKey.trim()) {
+      case 'เบอร์ 0':
+        return {'name': 'เบอร์ 0 (Extra Large)', 'color': Colors.red};
+      case 'เบอร์ 1':
+        return {'name': 'เบอร์ 1 (Large)', 'color': Colors.orange};
+      case 'เบอร์ 2':
+        return {'name': 'เบอร์ 2 (Medium)', 'color': Colors.amber};
+      case 'เบอร์ 3':
+        return {'name': 'เบอร์ 3 (Small)', 'color': Colors.green};
+      case 'เบอร์ 4':
+        return {'name': 'เบอร์ 4 (Extra Small)', 'color': Colors.blueGrey};
+      case 'เบอร์ 5':
+        return {'name': 'เบอร์ 5 (Pewee)', 'color': Colors.grey};
       default:
         return {'name': sizeKey, 'color': Colors.grey};
     }

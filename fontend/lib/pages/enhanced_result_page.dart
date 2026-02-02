@@ -69,9 +69,12 @@ class _EnhancedResultPageState extends State<EnhancedResultPage> {
         'image_path': imageUrl,
         'egg_count': widget.detectionResult.eggCount,
         'success_percent': widget.detectionResult.successPercent,
-        'big_count': widget.detectionResult.bigCount,
-        'medium_count': widget.detectionResult.mediumCount,
-        'small_count': widget.detectionResult.smallCount,
+        'grade0_count': widget.detectionResult.grade0Count,
+        'grade1_count': widget.detectionResult.grade1Count,
+        'grade2_count': widget.detectionResult.grade2Count,
+        'grade3_count': widget.detectionResult.grade3Count,
+        'grade4_count': widget.detectionResult.grade4Count,
+        'grade5_count': widget.detectionResult.grade5Count,
         'day': DateTime.now().day.toString(),
       };
 
@@ -104,14 +107,20 @@ class _EnhancedResultPageState extends State<EnhancedResultPage> {
 
   int _getGradeValue(String grade) {
     switch (grade.toLowerCase()) {
-      case 'big':
+      case 'grade0':
+        return 0;
+      case 'grade1':
         return 1;
-      case 'medium':
+      case 'grade2':
         return 2;
-      case 'small':
+      case 'grade3':
         return 3;
+      case 'grade4':
+        return 4;
+      case 'grade5':
+        return 5;
       default:
-        return 2;
+        return 5;
     }
   }
 
@@ -188,9 +197,12 @@ class _EnhancedResultPageState extends State<EnhancedResultPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _buildStatCard('Total Eggs', widget.detectionResult.eggCount.toString(), Colors.blue),
-                        _buildStatCard('Big', widget.detectionResult.bigCount.toString(), Colors.red),
-                        _buildStatCard('Medium', widget.detectionResult.mediumCount.toString(), Colors.orange),
-                        _buildStatCard('Small', widget.detectionResult.smallCount.toString(), Colors.green),
+                        _buildStatCard('เบอร์ 0', widget.detectionResult.grade0Count.toString(), Colors.red),
+                        _buildStatCard('เบอร์ 1', widget.detectionResult.grade1Count.toString(), Colors.orange),
+                        _buildStatCard('เบอร์ 2', widget.detectionResult.grade2Count.toString(), Colors.amber),
+                        _buildStatCard('เบอร์ 3', widget.detectionResult.grade3Count.toString(), Colors.green),
+                        _buildStatCard('เบอร์ 4', widget.detectionResult.grade4Count.toString(), Colors.blueGrey),
+                        _buildStatCard('เบอร์ 5', widget.detectionResult.grade5Count.toString(), Colors.grey),
                       ],
                     ),
                     const SizedBox(height: 15),
@@ -227,21 +239,39 @@ class _EnhancedResultPageState extends State<EnhancedResultPage> {
                           PieChartData(
                             sections: [
                               PieChartSectionData(
-                                value: widget.detectionResult.bigCount.toDouble(),
-                                title: 'Big\n${widget.detectionResult.bigCount}',
+                                value: widget.detectionResult.grade0Count.toDouble(),
+                                title: 'เบอร์ 0\n${widget.detectionResult.grade0Count}',
                                 color: Colors.red,
                                 radius: 50,
                               ),
                               PieChartSectionData(
-                                value: widget.detectionResult.mediumCount.toDouble(),
-                                title: 'Medium\n${widget.detectionResult.mediumCount}',
+                                value: widget.detectionResult.grade1Count.toDouble(),
+                                title: 'เบอร์ 1\n${widget.detectionResult.grade1Count}',
                                 color: Colors.orange,
                                 radius: 50,
                               ),
                               PieChartSectionData(
-                                value: widget.detectionResult.smallCount.toDouble(),
-                                title: 'Small\n${widget.detectionResult.smallCount}',
+                                value: widget.detectionResult.grade2Count.toDouble(),
+                                title: 'เบอร์ 2\n${widget.detectionResult.grade2Count}',
+                                color: Colors.amber,
+                                radius: 50,
+                              ),
+                              PieChartSectionData(
+                                value: widget.detectionResult.grade3Count.toDouble(),
+                                title: 'เบอร์ 3\n${widget.detectionResult.grade3Count}',
                                 color: Colors.green,
+                                radius: 50,
+                              ),
+                              PieChartSectionData(
+                                value: widget.detectionResult.grade4Count.toDouble(),
+                                title: 'เบอร์ 4\n${widget.detectionResult.grade4Count}',
+                                color: Colors.blueGrey,
+                                radius: 50,
+                              ),
+                              PieChartSectionData(
+                                value: widget.detectionResult.grade5Count.toDouble(),
+                                title: 'เบอร์ 5\n${widget.detectionResult.grade5Count}',
+                                color: Colors.grey,
                                 radius: 50,
                               ),
                             ],

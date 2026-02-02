@@ -32,9 +32,12 @@ CREATE TABLE IF NOT EXISTS egg_session (
   image_path TEXT NOT NULL,
   egg_count INTEGER NOT NULL,
   success_percent REAL NOT NULL,
-  big_count INTEGER NOT NULL,
-  medium_count INTEGER NOT NULL,
-  small_count INTEGER NOT NULL,
+  grade0_count INTEGER NOT NULL,
+  grade1_count INTEGER NOT NULL,
+  grade2_count INTEGER NOT NULL,
+  grade3_count INTEGER NOT NULL,
+  grade4_count INTEGER NOT NULL,
+  grade5_count INTEGER NOT NULL,
   day TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

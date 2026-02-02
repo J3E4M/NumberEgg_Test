@@ -223,9 +223,12 @@ class _SupabaseFeaturesDemoState extends State<SupabaseFeaturesDemo> {
             'image_path': '/test/path/image.jpg',
             'egg_count': 10,
             'success_percent': 85.5,
-            'big_count': 3,
-            'medium_count': 4,
-            'small_count': 3,
+            'grade0_count': 2,  // เบอร์ 0 (พิเศษ)
+            'grade1_count': 2,  // เบอร์ 1 (ใหญ่)
+            'grade2_count': 3,  // เบอร์ 2 (กลาง)
+            'grade3_count': 2,  // เบอร์ 3 (เล็ก)
+            'grade4_count': 1,  // เบอร์ 4 (เล็กมาก)
+            'grade5_count': 0,  // เบอร์ 5 (พิเศษเล็ก)
             'day': DateTime.now().toString().split(' ')[0],
           })
           .select()

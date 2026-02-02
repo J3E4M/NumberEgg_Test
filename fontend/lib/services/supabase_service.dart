@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:io';
 import '../config/supabase_config.dart';
+import 'supabase_storage_service.dart';
 
 class SupabaseService {
   static SupabaseClient? _client;
@@ -118,12 +121,18 @@ class SupabaseService {
     required String imagePath,
     required int eggCount,
     required double successPercent,
-    required int bigCount,
-    required int mediumCount,
-    required int smallCount,
+    required int grade0Count,
+    required int grade1Count,
+    required int grade2Count,
+    required int grade3Count,
+    required int grade4Count,
+    required int grade5Count,
     required String day,
   }) async {
     try {
+      debugPrint("🔄 Creating egg session with userId: $userId");
+      debugPrint("📊 Session data: eggs=$eggCount, grade0=$grade0Count, grade1=$grade1Count, grade2=$grade2Count, grade3=$grade3Count, grade4=$grade4Count, grade5=$grade5Count");
+      
       final response = await client
           .from('egg_session')
           .insert({
@@ -131,15 +140,19 @@ class SupabaseService {
             'image_path': imagePath,
             'egg_count': eggCount,
             'success_percent': successPercent,
-            'big_count': bigCount,
-            'medium_count': mediumCount,
-            'small_count': smallCount,
+            'grade0_count': grade0Count,
+            'grade1_count': grade1Count,
+            'grade2_count': grade2Count,
+            'grade3_count': grade3Count,
+            'grade4_count': grade4Count,
+            'grade5_count': grade5Count,
             'day': day,
             'created_at': DateTime.now().toIso8601String(),
           })
           .select()
           .single();
       
+      debugPrint("✅ Session created successfully: ${response['id']}");
       return response;
     } catch (e) {
       throw Exception('เกิดข้อผิดพลาดในการสร้าง egg session: $e');
@@ -183,22 +196,60 @@ class SupabaseService {
     required String imagePath,
     required int eggCount,
     required double successPercent,
-    required int bigCount,
-    required int mediumCount,
-    required int smallCount,
+    required int grade0Count,
+    required int grade1Count,
+    required int grade2Count,
+    required int grade3Count,
+    required int grade4Count,
+    required int grade5Count,
     required String day,
     required List<Map<String, dynamic>> eggItems,
   }) async {
     try {
-      // สร้าง session ก่อน
+      debugPrint("🔄 Creating egg session with image upload");
+      debugPrint("📸 Original imagePath: $imagePath");
+      
+      // อัพโหลดรูปภาพขึ้น Supabase Storage ก่อน
+      String uploadedImagePath = imagePath;
+      
+      try {
+        if (imagePath.isNotEmpty && File(imagePath).existsSync()) {
+          // อ่านไฟล์รูปภาพ
+          final imageFile = File(imagePath);
+          final imageBytes = await imageFile.readAsBytes();
+          final fileName = imagePath.split('/').last;
+          
+          debugPrint("📤 Uploading image to Supabase Storage: $fileName");
+          debugPrint("📏 Image size: ${imageBytes.length} bytes");
+          
+          // อัพโหลดขึ้น Supabase Storage
+          uploadedImagePath = await SupabaseStorageService.uploadEggImage(
+            imageBytes: imageBytes,
+            fileName: fileName,
+          );
+          
+          debugPrint("✅ Image uploaded successfully: $uploadedImagePath");
+        } else {
+          debugPrint("⚠️ Image file not found or path empty: $imagePath");
+          debugPrint("🔍 File exists check: ${imagePath.isNotEmpty ? File(imagePath).existsSync() : 'Empty path'}");
+        }
+      } catch (uploadError) {
+        debugPrint("❌ Image upload failed, using original path: $uploadError");
+        // ใช้ path เดิมถ้าอัพโหลดล้มเหลว
+      }
+      
+      // สร้าง session ด้วย uploaded image path
       final sessionResponse = await createEggSession(
         userId: userId,
-        imagePath: imagePath,
+        imagePath: uploadedImagePath,
         eggCount: eggCount,
         successPercent: successPercent,
-        bigCount: bigCount,
-        mediumCount: mediumCount,
-        smallCount: smallCount,
+        grade0Count: grade0Count,
+        grade1Count: grade1Count,
+        grade2Count: grade2Count,
+        grade3Count: grade3Count,
+        grade4Count: grade4Count,
+        grade5Count: grade5Count,
         day: day,
       );
 
@@ -207,8 +258,37 @@ class SupabaseService {
         ...item,
         'session_id': sessionResponse['id'],
       }).toList();
+      
+      debugPrint("📦 Creating ${itemsWithSessionId.length} egg items for session ${sessionResponse['id']}");
+      debugPrint("📋 Sample item: ${itemsWithSessionId.isNotEmpty ? itemsWithSessionId.first : 'No items'}");
+      debugPrint("📋 All items data: $itemsWithSessionId");
 
-      await client.from('egg_item').insert(itemsWithSessionId);
+      final insertResponse = await client.from('egg_item').insert(itemsWithSessionId).select();
+      debugPrint("✅ Egg items inserted successfully: ${insertResponse.length} items");
+      debugPrint("📋 Inserted items response: $insertResponse");
+      
+      // ตรวจสอบว่า items ถูกบันทึกจริงโดยดึงข้อมูลกลับมา
+      try {
+        final verifyItems = await client.from('egg_item')
+            .select('*')
+            .eq('session_id', sessionResponse['id'])
+            .order('id', ascending: true);
+        debugPrint("🔍 Verified ${verifyItems.length} items in database for session ${sessionResponse['id']}");
+        if (verifyItems.isNotEmpty) {
+          debugPrint("📋 First verified item: ${verifyItems.first}");
+        }
+      } catch (verifyError) {
+        debugPrint("❌ Error verifying items: $verifyError");
+      }
+      
+      if (insertResponse.isEmpty) {
+        debugPrint("⚠️ No items were inserted, checking data structure...");
+        for (var item in itemsWithSessionId) {
+          debugPrint("Item data: $item");
+        }
+      }
+      
+      debugPrint("✅ Egg session and items created successfully with uploaded image");
 
       return sessionResponse;
     } catch (e) {
@@ -274,9 +354,12 @@ class SupabaseService {
           .select('''
             egg_count,
             success_percent,
-            big_count,
-            medium_count,
-            small_count
+            grade0_count,
+            grade1_count,
+            grade2_count,
+            grade3_count,
+            grade4_count,
+            grade5_count
           ''');
 
       final sessions = List<Map<String, dynamic>>.from(response);
@@ -285,26 +368,35 @@ class SupabaseService {
         return {
           'total_sessions': 0,
           'total_eggs': 0,
-          'total_big': 0,
-          'total_medium': 0,
-          'total_small': 0,
+          'total_grade0': 0,
+          'total_grade1': 0,
+          'total_grade2': 0,
+          'total_grade3': 0,
+          'total_grade4': 0,
+          'total_grade5': 0,
           'average_success_percent': 0.0,
         };
       }
 
       final totalSessions = sessions.length;
       final totalEggs = sessions.fold<int>(0, (sum, session) => sum + (session['egg_count'] as int? ?? 0));
-      final totalBig = sessions.fold<int>(0, (sum, session) => sum + (session['big_count'] as int? ?? 0));
-      final totalMedium = sessions.fold<int>(0, (sum, session) => sum + (session['medium_count'] as int? ?? 0));
-      final totalSmall = sessions.fold<int>(0, (sum, session) => sum + (session['small_count'] as int? ?? 0));
+      final totalGrade0 = sessions.fold<int>(0, (sum, session) => sum + (session['grade0_count'] as int? ?? 0));
+      final totalGrade1 = sessions.fold<int>(0, (sum, session) => sum + (session['grade1_count'] as int? ?? 0));
+      final totalGrade2 = sessions.fold<int>(0, (sum, session) => sum + (session['grade2_count'] as int? ?? 0));
+      final totalGrade3 = sessions.fold<int>(0, (sum, session) => sum + (session['grade3_count'] as int? ?? 0));
+      final totalGrade4 = sessions.fold<int>(0, (sum, session) => sum + (session['grade4_count'] as int? ?? 0));
+      final totalGrade5 = sessions.fold<int>(0, (sum, session) => sum + (session['grade5_count'] as int? ?? 0));
       final avgSuccess = sessions.fold<double>(0, (sum, session) => sum + (session['success_percent'] as num? ?? 0)) / totalSessions;
 
       return {
         'total_sessions': totalSessions,
         'total_eggs': totalEggs,
-        'total_big': totalBig,
-        'total_medium': totalMedium,
-        'total_small': totalSmall,
+        'total_grade0': totalGrade0,
+        'total_grade1': totalGrade1,
+        'total_grade2': totalGrade2,
+        'total_grade3': totalGrade3,
+        'total_grade4': totalGrade4,
+        'total_grade5': totalGrade5,
         'average_success_percent': double.parse(avgSuccess.toStringAsFixed(2)),
       };
     } catch (e) {
@@ -346,9 +438,12 @@ class SupabaseService {
                 'image_path': session['image_path'],
                 'egg_count': session['egg_count'],
                 'success_percent': session['success_percent'],
-                'big_count': session['big_count'],
-                'medium_count': session['medium_count'],
-                'small_count': session['small_count'],
+                'grade0_count': session['grade0_count'],
+                'grade1_count': session['grade1_count'],
+                'grade2_count': session['grade2_count'],
+                'grade3_count': session['grade3_count'],
+                'grade4_count': session['grade4_count'],
+                'grade5_count': session['grade5_count'],
                 'day': session['day'],
                 'created_at': session['created_at'],
               })

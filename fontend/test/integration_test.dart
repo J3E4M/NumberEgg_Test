@@ -123,14 +123,17 @@ void main() {
         },
         'detection_results': {
           'egg_count': 3,
-          'big_count': 1,
-          'medium_count': 1,
-          'small_count': 1,
+          'grade0_count': 1,  // เบอร์ 0 (พิเศษ)
+          'grade1_count': 1,  // เบอร์ 1 (ใหญ่)
+          'grade2_count': 1,  // เบอร์ 2 (กลาง)
+          'grade3_count': 0,  // เบอร์ 3 (เล็ก)
+          'grade4_count': 0,  // เบอร์ 4 (เล็กมาก)
+          'grade5_count': 0,  // เบอร์ 5 (พิเศษเล็ก)
           'success_percent': 95.5,
           'detections': [
             {
               'id': 1,
-              'grade': 'big',
+              'grade': 'grade0',
               'confidence': 0.95,
               'bbox': {
                 'x1': 100.0,
@@ -150,9 +153,12 @@ void main() {
       final result = EggDetectionResult.fromJson(sampleJson);
       expect(result.success, isTrue);
       expect(result.eggCount, equals(3));
-      expect(result.bigCount, equals(1));
-      expect(result.mediumCount, equals(1));
-      expect(result.smallCount, equals(1));
+      expect(result.grade0Count, equals(1));
+      expect(result.grade1Count, equals(1));
+      expect(result.grade2Count, equals(1));
+      expect(result.grade3Count, equals(0));
+      expect(result.grade4Count, equals(0));
+      expect(result.grade5Count, equals(0));
       expect(result.successPercent, equals(95.5));
       expect(result.detections.length, equals(1));
     });
@@ -180,7 +186,7 @@ void main() {
       final detections = [
         Detection(
           id: 1,
-          grade: 'big',
+          grade: 'grade0',
           confidence: 0.95,
           bbox: BoundingBox(
             x1: 0, y1: 0, x2: 100, y2: 100,
@@ -189,7 +195,7 @@ void main() {
         ),
         Detection(
           id: 2,
-          grade: 'medium',
+          grade: 'grade2',
           confidence: 0.90,
           bbox: BoundingBox(
             x1: 0, y1: 0, x2: 80, y2: 80,
@@ -227,7 +233,7 @@ void main() {
       final List<Detection> largeDataset = List.generate(1000, (index) => 
         Detection(
           id: index,
-          grade: 'medium',
+          grade: 'grade2',
           confidence: 0.85,
           bbox: BoundingBox(
             x1: 0.0, y1: 0.0, x2: 50.0, y2: 50.0,
@@ -239,13 +245,13 @@ void main() {
       expect(largeDataset.length, equals(1000));
       
       // Test filtering operations
-      final bigEggs = largeDataset.where((d) => d.grade == 'big').toList();
-      final mediumEggs = largeDataset.where((d) => d.grade == 'medium').toList();
-      final smallEggs = largeDataset.where((d) => d.grade == 'small').toList();
+      final grade0Eggs = largeDataset.where((d) => d.grade == 'grade0').toList();
+      final grade2Eggs = largeDataset.where((d) => d.grade == 'grade2').toList();
+      final grade5Eggs = largeDataset.where((d) => d.grade == 'grade5').toList();
 
-      expect(bigEggs.length, equals(0));
-      expect(mediumEggs.length, equals(1000));
-      expect(smallEggs.length, equals(0));
+      expect(grade0Eggs.length, equals(0));
+      expect(grade2Eggs.length, equals(1000));
+      expect(grade5Eggs.length, equals(0));
     });
   });
 

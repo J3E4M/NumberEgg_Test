@@ -1,5 +1,5 @@
+import 'dart:developer'; // Add this line
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -19,17 +19,15 @@ class EggDatabase {
   }
 
   Future<Database> _initDB() async {
-    // Initialize database factory for web
-    if (kIsWeb) {
-      databaseFactory = databaseFactoryFfi;
-    }
+    // For mobile, use default database factory
+    // For web, we would need to use a different solution like Hive or SharedPreferences
     
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'egg.db');
 
     return await openDatabase(
       path,
-      version: 5, // ⭐ เพิ่ม version สำหรับ user_id column
+      version: 7, // ⭐ เพิ่ม version สำหรับบังคับ migration
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -43,9 +41,12 @@ class EggDatabase {
       image_path TEXT NOT NULL,
       egg_count INTEGER NOT NULL,
       success_percent REAL NOT NULL,
-      big_count INTEGER NOT NULL,
-      medium_count INTEGER NOT NULL,
-      small_count INTEGER NOT NULL,
+      grade0_count INTEGER NOT NULL,
+      grade1_count INTEGER NOT NULL,
+      grade2_count INTEGER NOT NULL,
+      grade3_count INTEGER NOT NULL,
+      grade4_count INTEGER NOT NULL,
+      grade5_count INTEGER NOT NULL,
       day TEXT NOT NULL,
       created_at TEXT NOT NULL
     )
@@ -91,6 +92,52 @@ class EggDatabase {
       await db.execute(
           'ALTER TABLE egg_session ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1');
     }
+
+    if (oldVersion < 6) {
+      // Add new grade columns
+      await db.execute(
+          'ALTER TABLE egg_session ADD COLUMN grade0_count INTEGER NOT NULL DEFAULT 0');
+      await db.execute(
+          'ALTER TABLE egg_session ADD COLUMN grade1_count INTEGER NOT NULL DEFAULT 0');
+      await db.execute(
+          'ALTER TABLE egg_session ADD COLUMN grade2_count INTEGER NOT NULL DEFAULT 0');
+      await db.execute(
+          'ALTER TABLE egg_session ADD COLUMN grade3_count INTEGER NOT NULL DEFAULT 0');
+      await db.execute(
+          'ALTER TABLE egg_session ADD COLUMN grade4_count INTEGER NOT NULL DEFAULT 0');
+      await db.execute(
+          'ALTER TABLE egg_session ADD COLUMN grade5_count INTEGER NOT NULL DEFAULT 0');
+      
+      // Drop old columns if they exist (to avoid NOT NULL constraint conflicts)
+      try {
+        await db.execute('ALTER TABLE egg_session DROP COLUMN big_count');
+        await db.execute('ALTER TABLE egg_session DROP COLUMN medium_count');
+        await db.execute('ALTER TABLE egg_session DROP COLUMN small_count');
+      } catch (e) {
+        debugPrint('Columns already dropped or do not exist: $e');
+      }
+    }
+
+    if (oldVersion < 7) {
+      // Force clean migration - recreate table with correct schema
+      await db.execute('DROP TABLE IF EXISTS egg_session_temp');
+      
+      await db.execute('''
+      CREATE TABLE egg_session_temp AS 
+      SELECT id, user_id, image_path, egg_count, success_percent,
+             COALESCE(grade0_count, 0) as grade0_count,
+             COALESCE(grade1_count, 0) as grade1_count,
+             COALESCE(grade2_count, 0) as grade2_count,
+             COALESCE(grade3_count, 0) as grade3_count,
+             COALESCE(grade4_count, 0) as grade4_count,
+             COALESCE(grade5_count, 0) as grade5_count,
+             day, created_at
+      FROM egg_session
+      ''');
+      
+      await db.execute('DROP TABLE egg_session');
+      await db.execute('ALTER TABLE egg_session_temp RENAME TO egg_session');
+    }
   }
 
   // ✅ INSERT SESSION
@@ -99,9 +146,12 @@ class EggDatabase {
     required String imagePath,
     required int eggCount,
     required double successPercent,
-    required int bigCount,
-    required int mediumCount,
-    required int smallCount,
+    int grade0Count = 0,
+    int grade1Count = 0,
+    int grade2Count = 0,
+    int grade3Count = 0,
+    int grade4Count = 0,
+    int grade5Count = 0,
     required String day,
   }) async {
     final db = await database;
@@ -113,9 +163,12 @@ class EggDatabase {
         'image_path': imagePath,
         'egg_count': eggCount,
         'success_percent': successPercent,
-        'big_count': bigCount,
-        'medium_count': mediumCount,
-        'small_count': smallCount,
+        'grade0_count': grade0Count,
+        'grade1_count': grade1Count,
+        'grade2_count': grade2Count,
+        'grade3_count': grade3Count,
+        'grade4_count': grade4Count,
+        'grade5_count': grade5Count,
         'day': day,
         'created_at': DateTime.now().toIso8601String(),
       },
@@ -217,16 +270,25 @@ class EggDatabase {
         section = 'OLDER';
       }
 
-      // ✅ สร้าง tags จาก DB จริง
+      // ✅ สร้าง tags จาก DB จริง (มาตรฐานไทย)
       final List<String> tags = [];
-      if ((row['big_count'] as int) > 0) {
-        tags.add("${row['big_count']}xใหญ่");
+      if ((row['grade0_count'] as int) > 0) {
+        tags.add("${row['grade0_count']}xเบอร์ 0");
       }
-      if ((row['medium_count'] as int) > 0) {
-        tags.add("${row['medium_count']}xกลาง");
+      if ((row['grade1_count'] as int) > 0) {
+        tags.add("${row['grade1_count']}xเบอร์ 1");
       }
-      if ((row['small_count'] as int) > 0) {
-        tags.add("${row['small_count']}xเล็ก");
+      if ((row['grade2_count'] as int) > 0) {
+        tags.add("${row['grade2_count']}xเบอร์ 2");
+      }
+      if ((row['grade3_count'] as int) > 0) {
+        tags.add("${row['grade3_count']}xเบอร์ 3");
+      }
+      if ((row['grade4_count'] as int) > 0) {
+        tags.add("${row['grade4_count']}xเบอร์ 4");
+      }
+      if ((row['grade5_count'] as int) > 0) {
+        tags.add("${row['grade5_count']}xเบอร์ 5");
       }
 
       return {
@@ -247,19 +309,24 @@ class EggDatabase {
 
     final result = await db.rawQuery('''
     SELECT 
-      SUM(big_count) as big,
-      SUM(medium_count) as medium,
-      SUM(small_count) as small
-    FROM egg_session
+      SUM(grade0_count) as grade0,
+      SUM(grade1_count) as grade1,
+      SUM(grade2_count) as grade2,
+      SUM(grade3_count) as grade3,
+      SUM(grade4_count) as grade4,
+      SUM(grade5_count) as grade5
+    FROM egg_session 
     WHERE day = ?
   ''', [today]);
 
     final row = result.first;
-
     return {
-      'big': (row['big'] as int?) ?? 0,
-      'medium': (row['medium'] as int?) ?? 0,
-      'small': (row['small'] as int?) ?? 0,
+      'เบอร์ 0': row['grade0'] as int? ?? 0,
+      'เบอร์ 1': row['grade1'] as int? ?? 0,
+      'เบอร์ 2': row['grade2'] as int? ?? 0,
+      'เบอร์ 3': row['grade3'] as int? ?? 0,
+      'เบอร์ 4': row['grade4'] as int? ?? 0,
+      'เบอร์ 5': row['grade5'] as int? ?? 0,
     };
   }
 
@@ -284,9 +351,12 @@ class EggDatabase {
     SELECT
       SUM(egg_count) as totalEgg,
       AVG(success_percent) as avgSuccess,
-      SUM(big_count) as big,
-      SUM(medium_count) as medium,
-      SUM(small_count) as small
+      SUM(grade0_count) as grade0,
+      SUM(grade1_count) as grade1,
+      SUM(grade2_count) as grade2,
+      SUM(grade3_count) as grade3,
+      SUM(grade4_count) as grade4,
+      SUM(grade5_count) as grade5
     FROM egg_session
   ''');
 

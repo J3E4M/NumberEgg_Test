@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:typed_data';
 import '../config/supabase_config.dart';
 
 /// 🎯 ตัวอย่างการใช้งาน Supabase Storage สำหรับเก็บรูปภาพไข่

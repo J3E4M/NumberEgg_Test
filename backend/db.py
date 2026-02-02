@@ -67,9 +67,12 @@ def init_db():
             image_path TEXT NOT NULL,
             egg_count INTEGER NOT NULL,
             success_percent REAL NOT NULL,
-            big_count INTEGER NOT NULL,
-            medium_count INTEGER NOT NULL,
-            small_count INTEGER NOT NULL,
+            grade0_count INTEGER NOT NULL,
+            grade1_count INTEGER NOT NULL,
+            grade2_count INTEGER NOT NULL,
+            grade3_count INTEGER NOT NULL,
+            grade4_count INTEGER NOT NULL,
+            grade5_count INTEGER NOT NULL,
             day TEXT NOT NULL,
             created_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(id)
@@ -322,16 +325,16 @@ def search_users(keyword):
 
 
 # Egg Session CRUD functions
-def insert_egg_session(user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day):
+def insert_egg_session(user_id, image_path, egg_count, success_percent, grade0_count, grade1_count, grade2_count, grade3_count, grade4_count, grade5_count, day):
     """เพิ่มข้อมูล egg session ใหม่"""
     from datetime import datetime
     conn = get_connection()
     cur = conn.cursor()
     now = datetime.now().isoformat()
     cur.execute("""
-        INSERT INTO egg_session (user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, now))
+        INSERT INTO egg_session (user_id, image_path, egg_count, success_percent, grade0_count, grade1_count, grade2_count, grade3_count, grade4_count, grade5_count, day, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, image_path, egg_count, success_percent, grade0_count, grade1_count, grade2_count, grade3_count, grade4_count, grade5_count, day, now))
     conn.commit()
     session_id = cur.lastrowid
     conn.close()
@@ -368,7 +371,7 @@ def get_egg_session_by_id(session_id):
     return session
 
 
-def update_egg_session(session_id, user_id=None, image_path=None, egg_count=None, success_percent=None, big_count=None, medium_count=None, small_count=None, day=None):
+def update_egg_session(session_id, user_id=None, image_path=None, egg_count=None, success_percent=None, grade0_count=None, grade1_count=None, grade2_count=None, grade3_count=None, grade4_count=None, grade5_count=None, day=None):
     """อัพเดทข้อมูล egg session"""
     from datetime import datetime
     conn = get_connection()
@@ -389,15 +392,24 @@ def update_egg_session(session_id, user_id=None, image_path=None, egg_count=None
     if success_percent is not None:
         fields.append("success_percent = ?")
         values.append(success_percent)
-    if big_count is not None:
-        fields.append("big_count = ?")
-        values.append(big_count)
-    if medium_count is not None:
-        fields.append("medium_count = ?")
-        values.append(medium_count)
-    if small_count is not None:
-        fields.append("small_count = ?")
-        values.append(small_count)
+    if grade0_count is not None:
+        fields.append("grade0_count = ?")
+        values.append(grade0_count)
+    if grade1_count is not None:
+        fields.append("grade1_count = ?")
+        values.append(grade1_count)
+    if grade2_count is not None:
+        fields.append("grade2_count = ?")
+        values.append(grade2_count)
+    if grade3_count is not None:
+        fields.append("grade3_count = ?")
+        values.append(grade3_count)
+    if grade4_count is not None:
+        fields.append("grade4_count = ?")
+        values.append(grade4_count)
+    if grade5_count is not None:
+        fields.append("grade5_count = ?")
+        values.append(grade5_count)
     if day is not None:
         fields.append("day = ?")
         values.append(day)
@@ -523,7 +535,7 @@ def delete_egg_items_by_session(session_id):
 
 
 # Special functions for egg management
-def add_egg_with_quantities(user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, egg_items_data):
+def add_egg_with_quantities(user_id, image_path, egg_count, success_percent, grade0_count, grade1_count, grade2_count, grade3_count, grade4_count, grade5_count, day, egg_items_data):
     """เพิ่มข้อมูล session พร้อม egg items พร้อมกัน"""
     from datetime import datetime
     conn = get_connection()
@@ -533,9 +545,9 @@ def add_egg_with_quantities(user_id, image_path, egg_count, success_percent, big
         # Insert session
         now = datetime.now().isoformat()
         cur.execute("""
-            INSERT INTO egg_session (user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, image_path, egg_count, success_percent, big_count, medium_count, small_count, day, now))
+            INSERT INTO egg_session (user_id, image_path, egg_count, success_percent, grade0_count, grade1_count, grade2_count, grade3_count, grade4_count, grade5_count, day, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, image_path, egg_count, success_percent, grade0_count, grade1_count, grade2_count, grade3_count, grade4_count, grade5_count, day, now))
         
         session_id = cur.lastrowid
         
@@ -587,11 +599,14 @@ def get_egg_statistics():
     total_eggs = cur.fetchone()[0] or 0
     
     # Get total by size
-    cur.execute("SELECT SUM(big_count), SUM(medium_count), SUM(small_count) FROM egg_session")
+    cur.execute("SELECT SUM(grade0_count), SUM(grade1_count), SUM(grade2_count), SUM(grade3_count), SUM(grade4_count), SUM(grade5_count) FROM egg_session")
     size_totals = cur.fetchone()
-    total_big = size_totals[0] or 0
-    total_medium = size_totals[1] or 0
-    total_small = size_totals[2] or 0
+    total_grade0 = size_totals[0] or 0
+    total_grade1 = size_totals[1] or 0
+    total_grade2 = size_totals[2] or 0
+    total_grade3 = size_totals[3] or 0
+    total_grade4 = size_totals[4] or 0
+    total_grade5 = size_totals[5] or 0
     
     # Get average success rate
     cur.execute("SELECT AVG(success_percent) FROM egg_session")
@@ -602,9 +617,12 @@ def get_egg_statistics():
     return {
         'total_sessions': total_sessions,
         'total_eggs': total_eggs,
-        'total_big': total_big,
-        'total_medium': total_medium,
-        'total_small': total_small,
+        'total_grade0': total_grade0,
+        'total_grade1': total_grade1,
+        'total_grade2': total_grade2,
+        'total_grade3': total_grade3,
+        'total_grade4': total_grade4,
+        'total_grade5': total_grade5,
         'average_success_percent': round(avg_success, 2)
     }
 

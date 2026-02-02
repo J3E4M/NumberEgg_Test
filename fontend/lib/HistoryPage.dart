@@ -33,9 +33,12 @@ class _HistoryPageState extends State<HistoryPage> {
   ];
 
   // Form controllers สำหรับการเพิ่ม session (ถ้าต้องการใช้ในอนาคต)
-  final _bigCountController = TextEditingController();
-  final _mediumCountController = TextEditingController();
-  final _smallCountController = TextEditingController();
+  final _grade0CountController = TextEditingController();
+  final _grade1CountController = TextEditingController();
+  final _grade2CountController = TextEditingController();
+  final _grade3CountController = TextEditingController();
+  final _grade4CountController = TextEditingController();
+  final _grade5CountController = TextEditingController();
   final _successPercentController = TextEditingController(text: '100.0');
   String? _selectedImagePath;
   bool _isLoading = false;
@@ -49,9 +52,12 @@ class _HistoryPageState extends State<HistoryPage> {
 
   // ฟังก์ชันช่วยเลือกสีตามขนาดไข่
   Color _getEggColor(String tag) {
-    if (tag.contains('ใหญ่')) return const Color(0xFFA52A2A);
-    if (tag.contains('กลาง')) return const Color(0xFFFF8C00);
-    if (tag.contains('เล็ก')) return const Color(0xFFFFC107);
+    if (tag.contains('เบอร์ 0')) return Colors.red;
+    if (tag.contains('เบอร์ 1')) return Colors.orange;
+    if (tag.contains('เบอร์ 2')) return Colors.amber;
+    if (tag.contains('เบอร์ 3')) return Colors.green;
+    if (tag.contains('เบอร์ 4')) return Colors.blueGrey;
+    if (tag.contains('เบอร์ 5')) return Colors.grey;
     return Colors.grey;
   }
 
@@ -141,14 +147,23 @@ class _HistoryPageState extends State<HistoryPage> {
 
       // สร้าง tags จาก DB จริง
       final List<String> tags = [];
-      if ((row['big_count'] as int) > 0) {
-        tags.add("${row['big_count']}xใหญ่");
+      if ((row['grade0_count'] as int) > 0) {
+        tags.add("${row['grade0_count']}xเบอร์ 0");
       }
-      if ((row['medium_count'] as int) > 0) {
-        tags.add("${row['medium_count']}xกลาง");
+      if ((row['grade1_count'] as int) > 0) {
+        tags.add("${row['grade1_count']}xเบอร์ 1");
       }
-      if ((row['small_count'] as int) > 0) {
-        tags.add("${row['small_count']}xเล็ก");
+      if ((row['grade2_count'] as int) > 0) {
+        tags.add("${row['grade2_count']}xเบอร์ 2");
+      }
+      if ((row['grade3_count'] as int) > 0) {
+        tags.add("${row['grade3_count']}xเบอร์ 3");
+      }
+      if ((row['grade4_count'] as int) > 0) {
+        tags.add("${row['grade4_count']}xเบอร์ 4");
+      }
+      if ((row['grade5_count'] as int) > 0) {
+        tags.add("${row['grade5_count']}xเบอร์ 5");
       }
 
       return {
@@ -788,9 +803,12 @@ class _HistoryPageState extends State<HistoryPage> {
 
   /// เพิ่ม session ใหม่พร้อมข้อมูลไข่
   Future<void> _addNewSession() async {
-    if (_bigCountController.text.isEmpty ||
-        _mediumCountController.text.isEmpty ||
-        _smallCountController.text.isEmpty ||
+    if (_grade0CountController.text.isEmpty ||
+        _grade1CountController.text.isEmpty ||
+        _grade2CountController.text.isEmpty ||
+        _grade3CountController.text.isEmpty ||
+        _grade4CountController.text.isEmpty ||
+        _grade5CountController.text.isEmpty ||
         _selectedImagePath == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -804,38 +822,41 @@ class _HistoryPageState extends State<HistoryPage> {
     setState(() => _isLoading = true);
 
     try {
-      final bigCount = int.parse(_bigCountController.text);
-      final mediumCount = int.parse(_mediumCountController.text);
-      final smallCount = int.parse(_smallCountController.text);
-      final totalEggs = bigCount + mediumCount + smallCount;
+      final grade0Count = int.parse(_grade0CountController.text);
+      final grade1Count = int.parse(_grade1CountController.text);
+      final grade2Count = int.parse(_grade2CountController.text);
+      final grade3Count = int.parse(_grade3CountController.text);
+      final grade4Count = int.parse(_grade4CountController.text);
+      final grade5Count = int.parse(_grade5CountController.text);
+      final totalEggs = grade0Count + grade1Count + grade2Count + grade3Count + grade4Count + grade5Count;
       final successPercent = double.parse(_successPercentController.text);
 
       // สร้าง session ใหม่ใน Supabase (แทน local SQLite)
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id') ?? 1; // Default to 1 if not found
       
+      debugPrint("🔍 HistoryPage Debug - User ID: $userId");
+      
       try {
         // สร้าง egg items สำหรับส่งไป Supabase
         final eggItems = <Map<String, dynamic>>[];
-        for (int i = 0; i < totalEggs; i++) {
-          int grade;
-          double confidence;
-          
-          if (i < bigCount) {
-            grade = 3; // ใหญ่
-            confidence = 85.0 + (i * 2.0); // 85-95%
-          } else if (i < bigCount + mediumCount) {
-            grade = 2; // กลาง
-            confidence = 75.0 + ((i - bigCount) * 3.0); // 75-90%
-          } else {
-            grade = 1; // เล็ก
-            confidence = 65.0 + ((i - bigCount - mediumCount) * 4.0); // 65-85%
-          }
+        final gradeBuckets = <int, int>{
+          0: grade0Count,
+          1: grade1Count,
+          2: grade2Count,
+          3: grade3Count,
+          4: grade4Count,
+          5: grade5Count,
+        };
+        for (int grade = 0; grade <= 5; grade++) {
+          for (int i = 0; i < (gradeBuckets[grade] ?? 0); i++) {
+            final confidence = 85.0 - (grade * 5) + (i * 1.5);
 
-          eggItems.add({
-            'grade': grade,
-            'confidence': confidence,
-          });
+            eggItems.add({
+              'grade': grade,
+              'confidence': confidence,
+            });
+          }
         }
 
         // สร้าง session พร้อม items ใน Supabase
@@ -844,46 +865,94 @@ class _HistoryPageState extends State<HistoryPage> {
           imagePath: _selectedImagePath!,
           eggCount: totalEggs,
           successPercent: successPercent,
-          bigCount: bigCount,
-          mediumCount: mediumCount,
-          smallCount: smallCount,
+          grade0Count: grade0Count,
+          grade1Count: grade1Count,
+          grade2Count: grade2Count,
+          grade3Count: grade3Count,
+          grade4Count: grade4Count,
+          grade5Count: grade5Count,
           day: DateTime.now().toIso8601String().substring(0, 10),
           eggItems: eggItems,
         );
-      } catch (e) {
-        // Fallback ไป local SQLite ถ้า Supabase ล้มเหลว
-        final sessionId = await EggDatabase.instance.insertSession(
-          userId: userId,
-          imagePath: _selectedImagePath!,
-          eggCount: totalEggs,
-          successPercent: successPercent,
-          bigCount: bigCount,
-          mediumCount: mediumCount,
-          smallCount: smallCount,
-          day: DateTime.now().toIso8601String().substring(0, 10),
-        );
 
-        // เพิ่ม egg items (สร้างข้อมูลจำลองสำหรับแต่ละไข่)
-        for (int i = 0; i < totalEggs; i++) {
-          int grade;
-          double confidence;
-          
-          if (i < bigCount) {
-            grade = 3; // ใหญ่
-            confidence = 85.0 + (i * 2.0); // 85-95%
-          } else if (i < bigCount + mediumCount) {
-            grade = 2; // กลาง
-            confidence = 75.0 + ((i - bigCount) * 3.0); // 75-90%
-          } else {
-            grade = 1; // เล็ก
-            confidence = 65.0 + ((i - bigCount - mediumCount) * 4.0); // 65-85%
-          }
+        debugPrint("✅ Supabase save successful");
 
-          await EggDatabase.instance.insertEggItem(
-            sessionId: sessionId,
-            grade: grade,
-            confidence: confidence,
+        // ✅ HYBRID: บันทึกลง Local SQLite ด้วยหลัง Supabase สำเร็จ
+        try {
+          final localSessionId = await EggDatabase.instance.insertSession(
+            userId: userId,
+            imagePath: _selectedImagePath!,
+            eggCount: totalEggs,
+            successPercent: successPercent,
+            grade0Count: grade0Count,
+            grade1Count: grade1Count,
+            grade2Count: grade2Count,
+            grade3Count: grade3Count,
+            grade4Count: grade4Count,
+            grade5Count: grade5Count,
+            day: DateTime.now().toIso8601String().substring(0, 10),
           );
+
+          // บันทึก egg items ลง SQLite
+          for (int grade = 0; grade <= 5; grade++) {
+            for (int i = 0; i < (gradeBuckets[grade] ?? 0); i++) {
+              final confidence = 85.0 - (grade * 5) + (i * 1.5);
+
+              await EggDatabase.instance.insertEggItem(
+                sessionId: localSessionId,
+                grade: grade,
+                confidence: confidence,
+              );
+            }
+          }
+          debugPrint("✅ Local SQLite save successful: Session $localSessionId");
+        } catch (sqliteError) {
+          debugPrint("❌ Local SQLite save failed: $sqliteError");
+          // ไม่ต้องแสดง error ให้ user เพราะ Supabase สำเร็จแล้ว
+        }
+
+      } catch (e) {
+        debugPrint("❌ Supabase save failed: $e");
+        
+        // Fallback ไป local SQLite ถ้า Supabase ล้มเหลว
+        try {
+          final sessionId = await EggDatabase.instance.insertSession(
+            userId: userId,
+            imagePath: _selectedImagePath!,
+            eggCount: totalEggs,
+            successPercent: successPercent,
+            grade0Count: grade0Count,
+            grade1Count: grade1Count,
+            grade2Count: grade2Count,
+            grade3Count: grade3Count,
+            grade4Count: grade4Count,
+            grade5Count: grade5Count,
+            day: DateTime.now().toIso8601String().substring(0, 10),
+          );
+
+          // เพิ่ม egg items (สร้างข้อมูลจำลองสำหรับแต่ละไข่)
+          final gradeBuckets = <int, int>{
+            0: grade0Count,
+            1: grade1Count,
+            2: grade2Count,
+            3: grade3Count,
+            4: grade4Count,
+            5: grade5Count,
+          };
+          for (int grade = 0; grade <= 5; grade++) {
+            for (int i = 0; i < (gradeBuckets[grade] ?? 0); i++) {
+              final confidence = 85.0 - (grade * 5) + (i * 1.5);
+
+              await EggDatabase.instance.insertEggItem(
+                sessionId: sessionId,
+                grade: grade,
+                confidence: confidence,
+              );
+            }
+          }
+          debugPrint("✅ Fallback SQLite save successful: Session $sessionId");
+        } catch (fallbackError) {
+          debugPrint("❌ Fallback SQLite also failed: $fallbackError");
         }
       }
 
@@ -920,9 +989,12 @@ class _HistoryPageState extends State<HistoryPage> {
 
   /// ล้างฟอร์ม
   void _clearForm() {
-    _bigCountController.clear();
-    _mediumCountController.clear();
-    _smallCountController.clear();
+    _grade0CountController.clear();
+    _grade1CountController.clear();
+    _grade2CountController.clear();
+    _grade3CountController.clear();
+    _grade4CountController.clear();
+    _grade5CountController.clear();
     _successPercentController.text = '100.0';
     _selectedImagePath = null;
   }
@@ -1004,10 +1076,10 @@ class _HistoryPageState extends State<HistoryPage> {
                     children: [
                       Expanded(
                         child: TextField(
-                          controller: _bigCountController,
+                          controller: _grade0CountController,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'ไข่ใหญ่',
+                            labelText: 'เบอร์ 0 (Extra Large)',
                             border: OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.egg),
                           ),
@@ -1016,10 +1088,10 @@ class _HistoryPageState extends State<HistoryPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: TextField(
-                          controller: _mediumCountController,
+                          controller: _grade1CountController,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'ไข่กลาง',
+                            labelText: 'เบอร์ 1 (Large)',
                             border: OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.egg_outlined),
                           ),
@@ -1028,10 +1100,10 @@ class _HistoryPageState extends State<HistoryPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: TextField(
-                          controller: _smallCountController,
+                          controller: _grade2CountController,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'ไข่เล็ก',
+                            labelText: 'เบอร์ 2 (Medium)',
                             border: OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.egg_alt),
                           ),

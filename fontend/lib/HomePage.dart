@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '/custom_bottom_nav.dart';
 import '../database/egg_database.dart';
+import '../services/supabase_service.dart';
 import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -19,33 +20,39 @@ class HomePage extends StatefulWidget {
 class SummaryReportCard extends StatelessWidget {
   final int totalEgg;
   final double avgSuccess;
-  final int big;
-  final int medium;
-  final int small;
+  final int grade0;
+  final int grade1;
+  final int grade2;
+  final int grade3;
+  final int grade4;
+  final int grade5;
 
   const SummaryReportCard({
     super.key,
     required this.totalEgg,
     required this.avgSuccess,
-    required this.big,
-    required this.medium,
-    required this.small,
+    required this.grade0,
+    required this.grade1,
+    required this.grade2,
+    required this.grade3,
+    required this.grade4,
+    required this.grade5,
   });
 
   List<String> _buildAutoInsight() {
     final List<String> insights = [];
 
-    if (big > medium && big > small) {
-      insights.add('📈 พบไข่เบอร์ใหญ่มีสัดส่วนสูง แสดงว่าผลผลิตอยู่ในเกณฑ์ดี');
+    if (grade0 > grade1 && grade0 > grade2 && grade0 > grade3 && grade0 > grade4 && grade0 > grade5) {
+      insights.add('📈 พบไข่เบอร์ 0 มีสัดส่วนสูง แสดงว่าผลผลิตอยู่ในเกณฑ์ดี');
     }
 
-    if (medium >= big && medium >= small) {
-      insights.add('🟡 พบไข่ขนาดกลางเป็นสัดส่วนมากที่สุด');
+    if (grade2 >= grade0 && grade2 >= grade1 && grade2 >= grade3 && grade2 >= grade4 && grade2 >= grade5) {
+      insights.add('🟡 พบไข่เบอร์ 2 เป็นสัดส่วนมากที่สุด');
     }
 
-    if (small > big) {
+    if (grade5 > grade0) {
       insights.add(
-          '⚠️ พบว่าไข่ขนาดเล็กมีจำนวนมาก ควรปรับปรุงการเลี้ยงหรือโภชนาการ');
+          '⚠️ พบว่าไข่เบอร์ 5 มีจำนวนมาก ควรปรับปรุงการเลี้ยงหรือโภชนาการ');
     }
 
     if (avgSuccess < 70) {
@@ -96,9 +103,12 @@ class SummaryReportCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          _buildRow('ใหญ่ (เบอร์ 0)', big, Colors.orange),
-          _buildRow('กลาง (เบอร์ 1)', medium, Colors.amber),
-          _buildRow('เล็ก (เบอร์ 2)', small, Colors.yellow),
+          _buildRow('เบอร์ 0 (Extra Large)', grade0, Colors.red),
+          _buildRow('เบอร์ 1 (Large)', grade1, Colors.orange),
+          _buildRow('เบอร์ 2 (Medium)', grade2, Colors.amber),
+          _buildRow('เบอร์ 3 (Small)', grade3, Colors.green),
+          _buildRow('เบอร์ 4 (Extra Small)', grade4, Colors.blueGrey),
+          _buildRow('เบอร์ 5 (Pewee)', grade5, Colors.grey),
 
           const SizedBox(height: 16),
           const Divider(),
@@ -341,25 +351,34 @@ class EggTrendLineChart extends StatelessWidget {
 }
 
 class TodayEggDonutChart extends StatelessWidget {
-  final int big;
-  final int medium;
-  final int small;
+  final int grade0;
+  final int grade1;
+  final int grade2;
+  final int grade3;
+  final int grade4;
+  final int grade5;
 
   const TodayEggDonutChart({
     super.key,
-    required this.big,
-    required this.medium,
-    required this.small,
+    required this.grade0,
+    required this.grade1,
+    required this.grade2,
+    required this.grade3,
+    required this.grade4,
+    required this.grade5,
   });
 
   @override
   Widget build(BuildContext context) {
-    final total = big + medium + small;
+    final total = grade0 + grade1 + grade2 + grade3 + grade4 + grade5;
 
     final items = [
-      _EggItem('ใหญ่', big, const Color(0xFFFF9800)),
-      _EggItem('กลาง', medium, const Color(0xFFFFC107)),
-      _EggItem('เล็ก', small, const Color(0xFFFFF176)),
+      _EggItem('เบอร์ 0', grade0, Colors.red),
+      _EggItem('เบอร์ 1', grade1, Colors.orange),
+      _EggItem('เบอร์ 2', grade2, Colors.amber),
+      _EggItem('เบอร์ 3', grade3, Colors.green),
+      _EggItem('เบอร์ 4', grade4, Colors.blueGrey),
+      _EggItem('เบอร์ 5', grade5, Colors.grey),
     ];
 
     final maxItem = items.reduce((a, b) => a.count >= b.count ? a : b);
@@ -520,10 +539,13 @@ class _HomePageState extends State<HomePage> {
   int _big = 0;
   int _medium = 0;
   int _small = 0;
+  int _grade3 = 0;
+  int _grade4 = 0;
+  int _grade5 = 0;
   DateTime _selectedDate = DateTime.now();
   final GlobalKey _captureKey = GlobalKey();
 
-  int get _totalEgg => _big + _medium + _small;
+  int get _totalEgg => _big + _medium + _small + _grade3 + _grade4 + _grade5;
 
   Future<void> _captureAndSave() async {
     try {
@@ -653,18 +675,33 @@ class _HomePageState extends State<HomePage> {
 
                     const Divider(height: 24),
 
-                    _eggInputField('ไข่ใหญ่', _big, (v) {
+                    _eggInputField('เบอร์ 0 (Extra Large)', _big, (v) {
                       setDialogState(() => _big = v);
                     }),
                     const SizedBox(height: 10),
 
-                    _eggInputField('ไข่กลาง', _medium, (v) {
+                    _eggInputField('เบอร์ 1 (Large)', _medium, (v) {
                       setDialogState(() => _medium = v);
                     }),
                     const SizedBox(height: 10),
 
-                    _eggInputField('ไข่เล็ก', _small, (v) {
+                    _eggInputField('เบอร์ 2 (Medium)', _small, (v) {
                       setDialogState(() => _small = v);
+                    }),
+                    const SizedBox(height: 10),
+
+                    _eggInputField('เบอร์ 3 (Small)', _grade3, (v) {
+                      setDialogState(() => _grade3 = v);
+                    }),
+                    const SizedBox(height: 10),
+
+                    _eggInputField('เบอร์ 4 (Extra Small)', _grade4, (v) {
+                      setDialogState(() => _grade4 = v);
+                    }),
+                    const SizedBox(height: 10),
+
+                    _eggInputField('เบอร์ 5 (Pewee)', _grade5, (v) {
+                      setDialogState(() => _grade5 = v);
                     }),
 
                     const SizedBox(height: 14),
@@ -739,22 +776,100 @@ class _HomePageState extends State<HomePage> {
 
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getInt('user_id') ?? 1; // Default to 1 if not found
+    
+    debugPrint("🔍 Debug - User ID from SharedPreferences: $userId");
+    debugPrint("🔍 Debug - All prefs keys: ${prefs.getKeys()}");
 
-    await EggDatabase.instance.insertSession(
-      userId: userId,
-      imagePath: 'manual',
-      eggCount: _totalEgg,
-      successPercent: 100,
-      bigCount: _big,
-      mediumCount: _medium,
-      smallCount: _small,
-      day: day,
-    );
+    debugPrint("🔄 Manual save to Supabase...");
+    debugPrint(
+        "📊 Manual eggs - Total: $_totalEgg, Grade0: $_big, Grade1: $_medium, Grade2: $_small, Grade3: $_grade3, Grade4: $_grade4, Grade5: $_grade5");
+
+    try {
+      // สร้าง egg items สำหรับ manual input
+      final eggItems = <Map<String, dynamic>>[];
+      
+      final gradeBuckets = <int, int>{
+        0: _big,
+        1: _medium,
+        2: _small,
+        3: _grade3,
+        4: _grade4,
+        5: _grade5,
+      };
+      for (int grade = 0; grade <= 5; grade++) {
+        for (int i = 0; i < (gradeBuckets[grade] ?? 0); i++) {
+          eggItems.add({
+            'grade': grade,
+            'confidence': 100.0,
+            // ไม่ส่ง bbox เนื่องจากตาราง egg_item ไม่มีคอลัมน์เหล่านี้
+          });
+        }
+      }
+      
+      debugPrint("📦 Created ${eggItems.length} manual egg items for Supabase");
+
+      // ส่งไป Supabase
+      await SupabaseService.createEggSessionWithItems(
+        userId: userId,
+        imagePath: 'manual',
+        eggCount: _totalEgg,
+        successPercent: 100,
+        grade0Count: _big,
+        grade1Count: _medium,
+        grade2Count: _small,
+        grade3Count: _grade3,
+        grade4Count: _grade4,
+        grade5Count: _grade5,
+        day: day,
+        eggItems: eggItems,
+      );
+
+      debugPrint("✅ Manual save to Supabase DONE: $_totalEgg eggs");
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("บันทึกข้อมูลไข่ $_totalEgg ฟองลง Supabase แล้ว"),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+    } catch (e) {
+      debugPrint("❌ Error saving manual data to Supabase: $e");
+      
+      // Fallback ไป SQLite ถ้า Supabase ล้มเหลว
+      await EggDatabase.instance.insertSession(
+        userId: userId,
+        imagePath: 'manual',
+        eggCount: _totalEgg,
+        successPercent: 100,
+        grade0Count: _big,
+        grade1Count: _medium,
+        grade2Count: _small,
+        grade3Count: _grade3,
+        grade4Count: _grade4,
+        grade5Count: _grade5,
+        day: day,
+      );
+
+      debugPrint("📱 Fallback to SQLite: $_totalEgg eggs");
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("บันทึกข้อมูลไข่ $_totalEgg ฟองลงฐานข้อมูลในเครื่อง"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
 
     Navigator.pop(context);
 
     setState(() {
-      _big = _medium = _small = 0;
+      _big = 0;
+      _medium = 0;
+      _small = 0;
+      _grade3 = 0;
+      _grade4 = 0;
+      _grade5 = 0;
     });
   }
 
@@ -811,9 +926,12 @@ class _HomePageState extends State<HomePage> {
                       title: 'ผลการวิเคราะห์จำนวนไข่ตามเบอร์',
                       subtitle: 'จำนวนไข่ตามเบอร์ (ประจำวัน)',
                       chart: TodayEggDonutChart(
-                        big: data['big'] ?? 0,
-                        medium: data['medium'] ?? 0,
-                        small: data['small'] ?? 0,
+                        grade0: data['เบอร์ 0'] ?? 0,
+                        grade1: data['เบอร์ 1'] ?? 0,
+                        grade2: data['เบอร์ 2'] ?? 0,
+                        grade3: data['เบอร์ 3'] ?? 0,
+                        grade4: data['เบอร์ 4'] ?? 0,
+                        grade5: data['เบอร์ 5'] ?? 0,
                       ),
                     );
                   },
@@ -864,9 +982,12 @@ class _HomePageState extends State<HomePage> {
                       chart: SummaryReportCard(
                         totalEgg: (data['totalEgg'] ?? 0).toInt(),
                         avgSuccess: (data['avgSuccess'] ?? 0).toDouble(),
-                        big: (data['big'] ?? 0).toInt(),
-                        medium: (data['medium'] ?? 0).toInt(),
-                        small: (data['small'] ?? 0).toInt(),
+                        grade0: (data['grade0'] ?? 0).toInt(),
+                        grade1: (data['grade1'] ?? 0).toInt(),
+                        grade2: (data['grade2'] ?? 0).toInt(),
+                        grade3: (data['grade3'] ?? 0).toInt(),
+                        grade4: (data['grade4'] ?? 0).toInt(),
+                        grade5: (data['grade5'] ?? 0).toInt(),
                       ),
                     );
                   },

@@ -26,9 +26,12 @@ CREATE TABLE egg_session (
   image_path TEXT NOT NULL,
   egg_count INTEGER NOT NULL,
   success_percent REAL NOT NULL,
-  big_count INTEGER NOT NULL,
-  medium_count INTEGER NOT NULL,
-  small_count INTEGER NOT NULL,
+  grade0_count INTEGER NOT NULL,
+  grade1_count INTEGER NOT NULL,
+  grade2_count INTEGER NOT NULL,
+  grade3_count INTEGER NOT NULL,
+  grade4_count INTEGER NOT NULL,
+  grade5_count INTEGER NOT NULL,
   day TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -95,8 +98,9 @@ CREATE POLICY "Users can insert own egg items" ON egg_item
 -- เพิ่มข้อมูลเริ่มต้น
 INSERT INTO privileges (name, description, level) VALUES 
 ('Admin', 'System administrator', 1),
-('User', 'Regular user', 2),
-('Guest', 'Guest user', 3);
+('Community internship supervisor', 'หัวหน้าสหกิจชุมชน', 2),
+('Farmer', 'เกษตรกร', 3),
+('General user ', 'ผู้ใช้ทั่วไป', 4);
 
 -- Create function to handle user registration
 CREATE OR REPLACE FUNCTION public.handle_new_user()

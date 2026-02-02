@@ -112,11 +112,14 @@ async def health_check():
     }
 
 @app.post("/detect")
-async def detect_eggs(file: UploadFile = File(...)):
+async def detect_eggs(
+    file: UploadFile = File(...),
+    user_id: Optional[int] = Form(None)  # รับ user_id จาก frontend
+):
     """
     Detect eggs in uploaded image using YOLO
     Returns egg count, sizes, and confidence scores
-    Saves image to Railway server and results to Supabase
+    Only processes detection, doesn't save image
     """
     if not model:
         raise HTTPException(status_code=500, detail="Model not loaded")
@@ -125,13 +128,8 @@ async def detect_eggs(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="File must be an image")
     
     try:
-        # Save uploaded file to Railway server
-        saved_file_path = save_uploaded_file(file)
-        
-        # Read and process image
-        with open(saved_file_path, "rb") as f:
-            contents = f.read()
-        
+        # Read image directly without saving
+        contents = await file.read()
         image = Image.open(io.BytesIO(contents))
         
         # Convert to RGB if needed
@@ -144,9 +142,12 @@ async def detect_eggs(file: UploadFile = File(...)):
         # Process detection results
         detections = []
         egg_count = 0
-        big_count = 0
-        medium_count = 0
-        small_count = 0
+        grade0_count = 0
+        grade1_count = 0
+        grade2_count = 0
+        grade3_count = 0
+        grade4_count = 0
+        grade5_count = 0
         
         for result in results:
             boxes = result.boxes
@@ -162,16 +163,26 @@ async def detect_eggs(file: UploadFile = File(...)):
                     height = y2 - y1
                     area = width * height
                     
-                    # Classify egg size (you may need to adjust these thresholds)
-                    egg_grade = "small"
-                    if area > 15000:  # Large eggs
-                        egg_grade = "big"
-                        big_count += 1
-                    elif area > 8000:  # Medium eggs
-                        egg_grade = "medium"
-                        medium_count += 1
-                    else:  # Small eggs
-                        small_count += 1
+                    # Classify egg size into 6 grades (approx. by bbox area)
+                    # TODO: calibrate with real-world scale
+                    if area >= 22000:
+                        egg_grade = "grade0"
+                        grade0_count += 1
+                    elif area >= 20000:
+                        egg_grade = "grade1"
+                        grade1_count += 1
+                    elif area >= 18000:
+                        egg_grade = "grade2"
+                        grade2_count += 1
+                    elif area >= 16000:
+                        egg_grade = "grade3"
+                        grade3_count += 1
+                    elif area >= 14000:
+                        egg_grade = "grade4"
+                        grade4_count += 1
+                    else:
+                        egg_grade = "grade5"
+                        grade5_count += 1
                     
                     egg_count += 1
                     
@@ -194,25 +205,24 @@ async def detect_eggs(file: UploadFile = File(...)):
         # Calculate success percentage
         success_percent = min(100.0, round((len(detections) / max(1, egg_count)) * 100, 2))
         
-        # Convert image to base64 for response
-        buffered = io.BytesIO()
-        image.save(buffered, format="JPEG")
-        img_base64 = base64.b64encode(buffered.getvalue()).decode()
-        
-        # Save detection results to Supabase
+        # Save results to Supabase if configured and user_id is provided
         session_id = None
-        if supabase:
+        if supabase and user_id is not None:
             try:
                 # Create egg session record
                 session_data = {
-                    "user_id": 1,  # Default user ID, should be from authentication
-                    "image_path": saved_file_path,  # Save Railway server path
+                    "user_id": user_id,  # ใช้ user_id จาก frontend
+                    "image_path": f"uploads/{uuid.uuid4()}.jpg",  # Supabase Storage path
                     "egg_count": egg_count,
                     "success_percent": success_percent,
-                    "big_count": big_count,
-                    "medium_count": medium_count,
-                    "small_count": small_count,
-                    "day": datetime.now().strftime("%Y-%m-%d")
+                    "grade0_count": grade0_count,
+                    "grade1_count": grade1_count,
+                    "grade2_count": grade2_count,
+                    "grade3_count": grade3_count,
+                    "grade4_count": grade4_count,
+                    "grade5_count": grade5_count,
+                    "day": datetime.now().strftime("%Y-%m-%d"),
+                    "created_at": datetime.now().isoformat()
                 }
                 
                 session_result = supabase.table("egg_session").insert(session_data).execute()
@@ -224,32 +234,41 @@ async def detect_eggs(file: UploadFile = File(...)):
                     for detection in detections:
                         item_data = {
                             "session_id": session_id,
-                            "grade": 1 if detection["grade"] == "big" else 2 if detection["grade"] == "medium" else 3,
+                            "grade": int(detection["grade"].replace("grade", "")) if "grade" in detection["grade"] else 5,
                             "confidence": detection["confidence"]
                         }
                         supabase.table("egg_item").insert(item_data).execute()
                     
-                    print(f"✅ Detection results saved to Supabase with session ID: {session_id}")
+                    print(f"✅ Detection results saved to Supabase with session ID: {session_id} for user {user_id}")
                 
             except Exception as e:
                 print(f"❌ Failed to save to Supabase: {e}")
+                session_id = None  # ถ้า save ล้มเหลว
+        
+        # Convert image to base64 for response
+        buffered = io.BytesIO()
+        image.save(buffered, format="JPEG")
+        img_base64 = base64.b64encode(buffered.getvalue()).decode()
         
         response = {
             "success": True,
             "timestamp": datetime.now().isoformat(),
-            "session_id": session_id,
+            "session_id": session_id,  # ใช้ session_id จาก Supabase
             "image_info": {
                 "filename": file.filename,
-                "saved_path": saved_file_path,  # Railway server path
+                "saved_path": f"uploads/{uuid.uuid4()}.jpg" if session_id else None,  # Supabase Storage path
                 "size": len(contents),
                 "format": image.format,
                 "dimensions": f"{image.width}x{image.height}"
             },
             "detection_results": {
                 "egg_count": egg_count,
-                "big_count": big_count,
-                "medium_count": medium_count,
-                "small_count": small_count,
+                "grade0_count": grade0_count,
+                "grade1_count": grade1_count,
+                "grade2_count": grade2_count,
+                "grade3_count": grade3_count,
+                "grade4_count": grade4_count,
+                "grade5_count": grade5_count,
                 "success_percent": success_percent,
                 "detections": detections
             },
