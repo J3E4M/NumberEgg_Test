@@ -345,6 +345,21 @@ class _SelectImageScreenState extends State<SelectImageScreen> {
         }
       }
       
+      // Validate bytes before decode
+      if (bytes.isEmpty || bytes.length < 100) {
+        throw Exception("Invalid image data: too small or empty");
+      }
+      
+      // Check for common image headers
+      final hasValidHeader = (bytes.length >= 4) &&
+          ((bytes[0] == 0xFF && bytes[1] == 0xD8) || // JPEG
+           (bytes[0] == 0x89 && bytes[1] == 0x50) || // PNG
+           (bytes[0] == 0x42 && bytes[1] == 0x4D));   // BMP
+      
+      if (!hasValidHeader) {
+        throw Exception("Invalid image data: no valid image header found");
+      }
+      
       // Create bitmap with proper format
       final codec = await ui.instantiateImageCodec(
         bytes,
@@ -442,6 +457,11 @@ class _SelectImageScreenState extends State<SelectImageScreen> {
         throw Exception('API Error: ${response.statusCode} - $body');
       }
       
+      // Validate response is JSON, not HTML or error page
+      if (!body.startsWith('{') && !body.startsWith('[')) {
+        throw Exception('Invalid response format. Expected JSON, got: ${body.substring(0, 100)}...');
+      }
+      
       final jsonData = jsonDecode(body);
 
       return jsonData;
@@ -522,10 +542,10 @@ class _SelectImageScreenState extends State<SelectImageScreen> {
         MaterialPageRoute(
           builder: (_) => DisplayPictureScreen(
             imageBytes: bytes,
-            detections: (detections['detection_results']['detections'] as List? ?? [])
+            detections: ((detections as Map?)?['detections'] as List? ?? [])
                 .map((e) => Detection.fromJson(e))
                 .toList(),
-            imagePath: detections['image_info']['saved_path'] ?? photo.path ?? '',
+            imagePath: ((detections as Map?)?['saved_path']) ?? photo.path ?? '',
             railwayResponse: detections,
           ),
         ),
