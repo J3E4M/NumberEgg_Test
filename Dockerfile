@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libglvnd0 \
     libglx-mesa0 \
+    libgl1-mesa-dev \
+    libegl1-mesa0 \
+    libgbm1 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
