@@ -88,6 +88,7 @@ class _SelectImageScreenState extends State<SelectImageScreen> {
   // Camera streaming variables
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
+  bool _controllerInitialized = false;
   CameraImage? _lastFrame;
   bool _isStreaming = false;
   int _frameCount = 0;
@@ -149,6 +150,9 @@ class _SelectImageScreenState extends State<SelectImageScreen> {
       _initializeControllerFuture = _controller.initialize().then((_) {
         _startFastStream();
         _startLiveDetection();
+        setState(() {
+          _controllerInitialized = true;
+        });
       });
       
       setState(() {
@@ -612,10 +616,10 @@ class _SelectImageScreenState extends State<SelectImageScreen> {
         MaterialPageRoute(
           builder: (_) => DisplayPictureScreen(
             imageBytes: bytes!,
-            detections: (detections['detection_results']['detections'] as List? ?? [])
+            detections: ((detections as Map?)?['detections'] as List? ?? [])
                 .map((e) => Detection.fromJson(e))
                 .toList(),
-            imagePath: detections['image_info']['saved_path'] ?? originalPath ?? '',
+            imagePath: ((detections as Map?)?['saved_path']) ?? originalPath ?? '',
             railwayResponse: detections,
           ),
         ),
@@ -638,6 +642,23 @@ class _SelectImageScreenState extends State<SelectImageScreen> {
   }
 
   Widget _buildCameraView() {
+    // Check if controller is initialized
+    if (!_controllerInitialized) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 20),
+            Text(
+              "กำลังเปิดกล้อง...",
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+      );
+    }
+    
     return Stack(
       children: [
         // Camera Preview
@@ -657,7 +678,7 @@ class _SelectImageScreenState extends State<SelectImageScreen> {
                     SizedBox(height: 20),
                     Text(
                       "กำลังเปิดกล้อง...",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(color: Colors.white),
                     ),
                   ],
                 ),

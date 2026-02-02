@@ -110,17 +110,18 @@ async def detect_eggs(file: UploadFile = File(...)):
             # Save to Supabase if available
             if supabase:
                 try:
-                    supabase.table("egg_detections").insert({
-                        "session_id": mock_results["session_id"],
+                    supabase.table("egg_session").insert({
+                        "user_id": 1,
+                        "image_path": mock_results["saved_path"],
+                        "egg_count": mock_results["detection_results"]["total_eggs"],
+                        "success_percent": mock_results["detection_results"]["success_percent"],
                         "grade0_count": mock_results["detection_results"]["grade0_count"],
                         "grade1_count": mock_results["detection_results"]["grade1_count"],
                         "grade2_count": mock_results["detection_results"]["grade2_count"],
                         "grade3_count": mock_results["detection_results"]["grade3_count"],
                         "grade4_count": mock_results["detection_results"]["grade4_count"],
                         "grade5_count": mock_results["detection_results"]["grade5_count"],
-                        "total_eggs": mock_results["detection_results"]["total_eggs"],
-                        "success_percent": mock_results["detection_results"]["success_percent"],
-                        "created_at": datetime.now().isoformat()
+                        "day": datetime.now().strftime("%Y-%m-%d")
                     }).execute()
                     print("✅ Saved to Supabase")
                 except Exception as e:
