@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir \
 COPY railway_app_real.py .
 
 # ✅ Download pre-converted ONNX model (ข้ามการ convert)
-RUN wget -q -O yolov8n.onnx https://github.com/ultralytics/assets/releases/download/v8.0.0/yolov8n.onnx
+RUN wget -q -O yolov8n.onnx https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.onnx
 
 # Create uploads directory
 RUN mkdir -p /app/uploads
