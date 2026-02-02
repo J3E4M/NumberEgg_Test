@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender-dev \
     libgomp1 \
     libgl1-mesa-glx \
+    libglvnd0 \
+    libglx-mesa0 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
