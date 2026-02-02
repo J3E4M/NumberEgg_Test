@@ -1,15 +1,15 @@
-# ONNX YOLO - Simple & Fast
+# ONNX YOLO - Simple & Working
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Minimal dependencies
+# Minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install packages (no ultralytics needed for inference)
+# Install Python packages (NO ultralytics - only for inference)
 RUN pip install --no-cache-dir \
     fastapi==0.104.1 \
     uvicorn==0.24.0 \
@@ -21,13 +21,13 @@ RUN pip install --no-cache-dir \
 # Copy application
 COPY railway_app_real.py .
 
-# ✅ Download pre-converted ONNX model (skip conversion)
+# ✅ Download pre-converted ONNX model (ข้ามการ convert)
 RUN wget -q -O yolov8n.onnx https://github.com/ultralytics/assets/releases/download/v8.0.0/yolov8n.onnx
 
-# Create uploads
+# Create uploads directory
 RUN mkdir -p /app/uploads
 
-# Clean cache
+# Clean pip cache
 RUN rm -rf /root/.cache/pip
 
 EXPOSE 8000
