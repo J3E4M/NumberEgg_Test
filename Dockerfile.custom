@@ -1,9 +1,9 @@
-# Real Egg Detection - < 1.5GB
+# Custom Egg Detection - < 1GB
 FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies for OpenCV
+# Install minimal system dependencies for OpenCV
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libsm6 \
@@ -13,15 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Copy real requirements
+# Copy custom requirements
 COPY railway_requirements_custom.txt requirements.txt
 
-# Install Python packages (real OpenCV version)
+# Install Python packages (no AI libraries!)
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy real app and detector
-COPY railway_app_real.py .
-COPY egg_detector_real.py .
+# Copy custom app and detector
+COPY railway_app_custom.py .
+COPY egg_detector.py .
 
 # Create uploads
 RUN mkdir -p /app/uploads
@@ -32,4 +32,4 @@ RUN find /usr/local/lib/python3.9 -name "__pycache__" -type d -exec rm -rf {} +
 RUN rm -rf /root/.cache/pip
 
 EXPOSE 8000
-CMD ["python", "railway_app_real.py"]
+CMD ["python", "railway_app_custom.py"]
