@@ -15,13 +15,16 @@ RUN pip install --no-cache-dir \
     uvicorn==0.24.0 \
     onnxruntime==1.16.3 \
     numpy==1.24.4 \
-    pillow==10.0.0
+    pillow==10.0.0 \
+    ultralytics==8.0.196
 
 # Copy app
 COPY railway_app_real.py .
 
-# Download YOLO ONNX model from Hugging Face
-RUN wget -O yolov8n.onnx https://huggingface.co/ultralytics/YOLOv8/resolve/main/yolov8n.onnx
+# Download .pt and convert to .onnx
+RUN wget -O yolov8n.pt https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt && \
+    python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='onnx', imgsz=640)" && \
+    rm yolov8n.pt
 
 # Create uploads
 RUN mkdir -p /app/uploads
