@@ -1,12 +1,20 @@
-# Ultra minimal - no AI, just API
-FROM python:3.9-alpine
+# YOLO Detection with PyTorch support
+FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install minimal dependencies
-RUN apk add --no-cache wget curl
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    curl \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements (minimal)
+# Copy requirements
 COPY railway_requirements_fixed.txt requirements.txt
 
 # Install Python packages
