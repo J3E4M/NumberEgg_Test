@@ -93,7 +93,7 @@ async def health_check():
     }
 
 @app.post("/detect")
-async def detect_eggs(file: UploadFile = File(...)):
+async def detect_eggs(file: UploadFile = File(...), user_id: int = 1):
     """Real egg detection endpoint"""
     try:
         if egg_detector is None:
@@ -136,20 +136,21 @@ async def detect_eggs(file: UploadFile = File(...)):
         # Save to Supabase if available
         if supabase:
             try:
-                supabase.table("egg_detections").insert({
-                    "session_id": detection_results["session_id"],
+                supabase.table("egg_session").insert({
+                    "user_id": user_id,
+                    "image_path": detection_results["saved_path"],
+                    "egg_count": detection_results["detection_results"]["total_eggs"],
+                    "success_percent": detection_results["detection_results"]["success_percent"],
                     "grade0_count": detection_results["detection_results"]["grade0_count"],
                     "grade1_count": detection_results["detection_results"]["grade1_count"],
                     "grade2_count": detection_results["detection_results"]["grade2_count"],
                     "grade3_count": detection_results["detection_results"]["grade3_count"],
                     "grade4_count": detection_results["detection_results"]["grade4_count"],
                     "grade5_count": detection_results["detection_results"]["grade5_count"],
-                    "total_eggs": detection_results["detection_results"]["total_eggs"],
-                    "success_percent": detection_results["detection_results"]["success_percent"],
-                    "model_type": "real_opencv",
+                    "day": datetime.now().strftime("%Y-%m-%d"),
                     "created_at": datetime.now().isoformat()
                 }).execute()
-                print("✅ Saved to Supabase")
+                print(f"✅ Saved to Supabase (egg_session) for user_id: {user_id}")
             except Exception as e:
                 print(f"❌ Supabase save failed: {e}")
         

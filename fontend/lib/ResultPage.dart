@@ -49,6 +49,7 @@ class _ResultPageState extends State<ResultPage> {
     
     if (sessionId != null) {
       try {
+        debugPrint("🔍 ResultPage: Loading egg items for session: $sessionId");
         final db = await EggDatabase.instance.database;
         final items = await db.query(
           'egg_item',
@@ -57,6 +58,8 @@ class _ResultPageState extends State<ResultPage> {
           orderBy: 'id ASC',
         );
         
+        debugPrint("📊 ResultPage: Found ${items.length} egg items");
+        
         setState(() {
           _eggItems = items.map((item) => {
             'grade': item['grade'],
@@ -64,7 +67,10 @@ class _ResultPageState extends State<ResultPage> {
             'id': item['id'],
           }).toList();
         });
+        
+        debugPrint("✅ ResultPage: Loaded ${_eggItems.length} egg items successfully");
       } catch (e) {
+        debugPrint("❌ ResultPage: Error loading egg items: $e");
         print('Error loading egg items: $e');
       }
     }

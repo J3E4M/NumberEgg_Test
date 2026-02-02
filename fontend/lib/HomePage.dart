@@ -454,30 +454,32 @@ class TodayEggDonutChart extends StatelessWidget {
           // ---------- RIGHT (INFO) ----------
           Expanded(
             flex: 4,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'สรุปผลวันนี้',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ...items.map(
-                  (e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _infoRow(
-                      'ไข่${e.label}',
-                      '${e.count} ฟอง',
-                      e.color,
-                      bold: e == maxItem,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'สรุปผลวันนี้',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  ...items.map(
+                    (e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _infoRow(
+                        'ไข่${e.label}',
+                        '${e.count} ฟอง',
+                        e.color,
+                        bold: e == maxItem,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -837,7 +839,10 @@ class _HomePageState extends State<HomePage> {
       debugPrint("❌ Error saving manual data to Supabase: $e");
       
       // Fallback ไป SQLite ถ้า Supabase ล้มเหลว
-      await EggDatabase.instance.insertSession(
+      debugPrint("🗄️ HomePage: Saving manual data to SQLite...");
+      debugPrint("📊 Manual data - Total: $_totalEgg, Grade0: $_big, Grade1: $_medium, Grade2: $_small, Grade3: $_grade3, Grade4: $_grade4, Grade5: $_grade5");
+      
+      final sessionId = await EggDatabase.instance.insertSession(
         userId: userId,
         imagePath: 'manual',
         eggCount: _totalEgg,
@@ -851,6 +856,7 @@ class _HomePageState extends State<HomePage> {
         day: day,
       );
 
+      debugPrint("✅ HomePage: Manual session saved with ID: $sessionId");
       debugPrint("📱 Fallback to SQLite: $_totalEgg eggs");
       
       ScaffoldMessenger.of(context).showSnackBar(

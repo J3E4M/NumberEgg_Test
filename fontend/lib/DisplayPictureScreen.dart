@@ -170,6 +170,9 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
 
       // บันทึกลง SQLite เท่านั้น
       try {
+        debugPrint("🗄️ Starting SQLite save process...");
+        debugPrint("📊 Total egg items to save: ${eggItems.length}");
+        
         final sessionId = await EggDatabase.instance.insertSession(
           userId: userId,
           imagePath: widget.imagePath ?? 'display_image',
@@ -187,7 +190,10 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
           day: DateTime.now().toString().substring(0, 10),
         );
         
+        debugPrint("✅ Session saved with ID: $sessionId");
+        
         // บันทึกรายการไข่แต่ละอันลง SQLite
+        int itemsSaved = 0;
         for (final item in eggItems) {
           if (item != null && item['grade'] != null && item['confidence'] != null) {
             await EggDatabase.instance.insertEggItem(
@@ -195,8 +201,15 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
               grade: item['grade'] as int,
               confidence: item['confidence'] as double,
             );
+            itemsSaved++;
+            debugPrint("🥚 Saved egg item: grade=${item['grade']}, confidence=${item['confidence']}");
           }
         }
+        
+        debugPrint("✅ Total egg items saved to SQLite: $itemsSaved");
+        
+        // ตรวจสอบข้อมูลที่บันทึก
+        await _verifySQLiteData(sessionId);
         
         debugPrint("✅ Save to SQLite สำเร็จ - Session ID: $sessionId");
         
@@ -239,6 +252,57 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
       if (mounted) {
         setState(() { isSaving = false; });
       }
+    }
+  }
+
+  // ฟังก์ชันตรวจสอบข้อมูล SQLite
+  Future<void> _verifySQLiteData(int sessionId) async {
+    try {
+      debugPrint("🔍 Verifying SQLite data for session: $sessionId");
+      
+      final db = await EggDatabase.instance.database;
+      
+      // ตรวจสอบ session
+      final sessionResults = await db.query(
+        'egg_session',
+        where: 'id = ?',
+        whereArgs: [sessionId],
+      );
+      
+      if (sessionResults.isNotEmpty) {
+        final session = sessionResults.first;
+        debugPrint("📋 Session found:");
+        debugPrint("   - User ID: ${session['user_id']}");
+        debugPrint("   - Egg Count: ${session['egg_count']}");
+        debugPrint("   - Success Percent: ${session['success_percent']}");
+        debugPrint("   - Grade0: ${session['grade0_count']}");
+        debugPrint("   - Grade1: ${session['grade1_count']}");
+        debugPrint("   - Grade2: ${session['grade2_count']}");
+        debugPrint("   - Grade3: ${session['grade3_count']}");
+        debugPrint("   - Grade4: ${session['grade4_count']}");
+        debugPrint("   - Grade5: ${session['grade5_count']}");
+        debugPrint("   - Day: ${session['day']}");
+      } else {
+        debugPrint("❌ No session found with ID: $sessionId");
+      }
+      
+      // ตรวจสอบ egg items
+      final itemResults = await db.query(
+        'egg_item',
+        where: 'session_id = ?',
+        whereArgs: [sessionId],
+      );
+      
+      debugPrint("🥚 Egg items found: ${itemResults.length}");
+      for (int i = 0; i < itemResults.length; i++) {
+        final item = itemResults[i];
+        debugPrint("   - Item ${i+1}: grade=${item['grade']}, confidence=${item['confidence']}");
+      }
+      
+      debugPrint("✅ SQLite verification complete");
+      
+    } catch (e) {
+      debugPrint("❌ Error verifying SQLite data: $e");
     }
   }
 

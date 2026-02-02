@@ -877,8 +877,11 @@ class _HistoryPageState extends State<HistoryPage> {
 
         debugPrint("✅ Supabase save successful");
 
-        // ✅ HYBRID: บันทึกลง Local SQLite ด้วยหลัง Supabase สำเร็จ
+        // ✅ HYBRID: บันทึกลง Local SQLite ด้วยหลัง Supabase สำเริ่ม
         try {
+          debugPrint("🗄️ HistoryPage: Saving manual entry to SQLite...");
+          debugPrint("📊 History manual data - Total: $totalEggs, Grade0: $grade0Count, Grade1: $grade1Count, Grade2: $grade2Count, Grade3: $grade3Count, Grade4: $grade4Count, Grade5: $grade5Count");
+          
           final localSessionId = await EggDatabase.instance.insertSession(
             userId: userId,
             imagePath: _selectedImagePath!,
@@ -893,7 +896,10 @@ class _HistoryPageState extends State<HistoryPage> {
             day: DateTime.now().toIso8601String().substring(0, 10),
           );
 
+          debugPrint("✅ HistoryPage: Manual session saved with ID: $localSessionId");
+
           // บันทึก egg items ลง SQLite
+          int itemsSaved = 0;
           for (int grade = 0; grade <= 5; grade++) {
             for (int i = 0; i < (gradeBuckets[grade] ?? 0); i++) {
               final confidence = 85.0 - (grade * 5) + (i * 1.5);
@@ -903,8 +909,11 @@ class _HistoryPageState extends State<HistoryPage> {
                 grade: grade,
                 confidence: confidence,
               );
+              itemsSaved++;
             }
           }
+          
+          debugPrint("✅ HistoryPage: Total egg items saved to SQLite: $itemsSaved");
           debugPrint("✅ Local SQLite save successful: Session $localSessionId");
         } catch (sqliteError) {
           debugPrint("❌ Local SQLite save failed: $sqliteError");
@@ -916,6 +925,9 @@ class _HistoryPageState extends State<HistoryPage> {
         
         // Fallback ไป local SQLite ถ้า Supabase ล้มเหลว
         try {
+          debugPrint("🗄️ HistoryPage: Fallback - saving to SQLite only...");
+          debugPrint("📊 Fallback data - Total: $totalEggs, Grade0: $grade0Count, Grade1: $grade1Count, Grade2: $grade2Count, Grade3: $grade3Count, Grade4: $grade4Count, Grade5: $grade5Count");
+          
           final sessionId = await EggDatabase.instance.insertSession(
             userId: userId,
             imagePath: _selectedImagePath!,
@@ -930,6 +942,8 @@ class _HistoryPageState extends State<HistoryPage> {
             day: DateTime.now().toIso8601String().substring(0, 10),
           );
 
+          debugPrint("✅ HistoryPage: Fallback session saved with ID: $sessionId");
+
           // เพิ่ม egg items (สร้างข้อมูลจำลองสำหรับแต่ละไข่)
           final gradeBuckets = <int, int>{
             0: grade0Count,
@@ -939,6 +953,7 @@ class _HistoryPageState extends State<HistoryPage> {
             4: grade4Count,
             5: grade5Count,
           };
+          int fallbackItemsSaved = 0;
           for (int grade = 0; grade <= 5; grade++) {
             for (int i = 0; i < (gradeBuckets[grade] ?? 0); i++) {
               final confidence = 85.0 - (grade * 5) + (i * 1.5);
@@ -948,8 +963,10 @@ class _HistoryPageState extends State<HistoryPage> {
                 grade: grade,
                 confidence: confidence,
               );
+              fallbackItemsSaved++;
             }
           }
+          debugPrint("✅ HistoryPage: Fallback total egg items saved: $fallbackItemsSaved");
           debugPrint("✅ Fallback SQLite save successful: Session $sessionId");
         } catch (fallbackError) {
           debugPrint("❌ Fallback SQLite also failed: $fallbackError");

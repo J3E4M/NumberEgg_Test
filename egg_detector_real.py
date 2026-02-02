@@ -20,23 +20,23 @@ class RealEggDetector:
         logger.info("🥚 Initializing Real Egg Detector...")
         
         # Thai Industrial Standard TIS 227-2524 egg grading (pixels)
-        # ค่าประมาณสำหรับภาพปกติ สามารถ calibrate ได้
+        # ค่าประมาณสำหรับภาพปกติ สามารถ calibrate ได้ - adjusted for smaller min_area
         self.grade_thresholds = {
-            "grade0": 28000,  # เบอร์ 0 (พิเศษ) - ใหญ่พิเศษ > 70g
-            "grade1": 22000,  # เบอร์ 1 (ใหญ่) - 60-70g
-            "grade2": 17000,  # เบอร์ 2 (กลาง) - 50-60g
-            "grade3": 12000,  # เบอร์ 3 (เล็ก) - 40-50g
-            "grade4": 7000,   # เบอร์ 4 (เล็กมาก) - 30-40g
+            "grade0": 15000,  # เบอร์ 0 (พิเศษ) - ใหญ่พิเศษ > 70g
+            "grade1": 10000,  # เบอร์ 1 (ใหญ่) - 60-70g
+            "grade2": 6000,   # เบอร์ 2 (กลาง) - 50-60g
+            "grade3": 3000,   # เบอร์ 3 (เล็ก) - 40-50g
+            "grade4": 1500,   # เบอร์ 4 (เล็กมาก) - 30-40g
             "grade5": 0       # เบอร์ 5 (พิเศษเล็ก) - < 30g
         }
         
-        # Egg detection parameters
-        self.min_area = 3000          # พื้นที่น้อยสุด (noise)
-        self.max_area = 60000         # พื้นที่มากสุด (ไม่ใช่ไข่)
-        self.min_aspect = 0.6         # aspect ratio น้อยสุด (รีเกินไป)
-        self.max_aspect = 1.8         # aspect ratio มากสุด (กลมเกินไป)
-        self.min_circularity = 0.4    # ความกลมน้อยสุด
-        self.min_confidence = 0.3     # confidence น้อยสุด
+        # Egg detection parameters - more lenient for better detection
+        self.min_area = 500           # พื้นที่น้อยสุด (noise) - reduced from 3000
+        self.max_area = 100000        # พื้นที่มากสุด (ไม่ใช่ไข่) - increased from 60000
+        self.min_aspect = 0.3         # aspect ratio น้อยสุด (รีเกินไป) - reduced from 0.6
+        self.max_aspect = 3.0         # aspect ratio มากสุด (กลมเกินไป) - increased from 1.8
+        self.min_circularity = 0.2    # ความกลมน้อยสุด - reduced from 0.4
+        self.min_confidence = 0.2     # confidence น้อยสุด - reduced from 0.3
         
         logger.info("✅ Real Egg Detector initialized successfully!")
     
@@ -65,8 +65,8 @@ class RealEggDetector:
     def detect_edges(self, gray_image: np.ndarray) -> np.ndarray:
         """Detect edges using multiple methods"""
         try:
-            # Method 1: Canny edge detection
-            edges_canny = cv2.Canny(gray_image, 50, 150)
+            # Method 1: Canny edge detection with lower thresholds for better sensitivity
+            edges_canny = cv2.Canny(gray_image, 30, 100)  # Reduced from 50, 150
             
             # Method 2: Sobel edge detection
             sobel_x = cv2.Sobel(gray_image, cv2.CV_64F, 1, 0, ksize=3)
@@ -74,8 +74,19 @@ class RealEggDetector:
             sobel_magnitude = np.sqrt(sobel_x**2 + sobel_y**2)
             sobel_magnitude = np.uint8(sobel_magnitude / sobel_magnitude.max() * 255)
             
-            # Combine both methods
+            # Method 3: Adaptive threshold for better edge detection in varying lighting
+            adaptive_thresh = cv2.adaptiveThreshold(
+                gray_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+            )
+            
+            # Combine all methods
             combined_edges = cv2.bitwise_or(edges_canny, sobel_magnitude)
+            combined_edges = cv2.bitwise_or(combined_edges, adaptive_thresh)
+            
+            # Morphological operations to close gaps
+            kernel = np.ones((3,3), np.uint8)
+            combined_edges = cv2.morphologyEx(combined_edges, cv2.MORPH_CLOSE, kernel)
+            combined_edges = cv2.morphologyEx(combined_edges, cv2.MORPH_DILATE, kernel)
             
             return combined_edges
             
@@ -92,7 +103,9 @@ class RealEggDetector:
             egg_contours = []
             height, width = original_shape
             
-            for contour in contours:
+            logger.info(f"🔍 Processing {len(contours)} total contours...")
+            
+            for i, contour in enumerate(contours):
                 # Calculate contour properties
                 area = cv2.contourArea(contour)
                 
@@ -104,7 +117,7 @@ class RealEggDetector:
                 x, y, w, h = cv2.boundingRect(contour)
                 aspect_ratio = w / h
                 
-                # Skip if not egg-shaped (eggs are typically oval)
+                # Skip if not egg-shaped (eggs are typically oval) - more lenient now
                 if aspect_ratio < self.min_aspect or aspect_ratio > self.max_aspect:
                     continue
                 
@@ -115,12 +128,13 @@ class RealEggDetector:
                     if circularity < self.min_circularity:
                         continue
                 
-                # Additional check: contour should be reasonably smooth
+                # Additional check: contour should be reasonably smooth - more lenient
                 approx = cv2.approxPolyDP(contour, 0.02 * perimeter, True)
-                if len(approx) < 8 or len(approx) > 20:  # Too few or too many points
+                if len(approx) < 6 or len(approx) > 30:  # Relaxed from 8-20 to 6-30
                     continue
                 
                 egg_contours.append(contour)
+                logger.info(f"✅ Contour {i+1}: area={area:.0f}, aspect={aspect_ratio:.2f}, circularity={circularity:.2f}")
             
             logger.info(f"🔍 Found {len(egg_contours)} egg-like contours from {len(contours)} total contours")
             return egg_contours
