@@ -19,8 +19,17 @@ from typing import Optional
 import uuid
 import shutil
 from pathlib import Path
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="NumberEgg Simple API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_supabase()
+    print("✅ Supabase connected successfully")
+    yield
+    # Shutdown (if needed)
+
+app = FastAPI(title="NumberEgg Simple API", version="1.0.0", lifespan=lifespan)
 
 # Load environment variables
 load_dotenv()
@@ -53,11 +62,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    init_supabase()
 
 @app.get("/")
 async def root():
