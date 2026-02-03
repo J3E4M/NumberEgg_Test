@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'railway_api.dart';
 
 class EggTrainingService {
-  static const String _baseUrl = 'https://your-railway-app-url.railway.app'; // Replace with your Railway URL
+  static const String _baseUrl = 'https://numbereggrailway-production.up.railway.app'; // Railway URL (production)
   
   static final Dio _dio = Dio(BaseOptions(
     baseUrl: _baseUrl,

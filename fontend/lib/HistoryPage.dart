@@ -858,6 +858,16 @@ class _HistoryPageState extends State<HistoryPage> {
 
         debugPrint("✅ HistoryPage: Manual session saved with ID: $localSessionId");
 
+        // สร้าง grade buckets สำหรับการวนลูป
+        final gradeBuckets = <int, int>{
+          0: grade0Count,
+          1: grade1Count,
+          2: grade2Count,
+          3: grade3Count,
+          4: grade4Count,
+          5: grade5Count,
+        };
+
         // บันทึก egg items ลง SQLite
         int itemsSaved = 0;
         for (int grade = 0; grade <= 5; grade++) {
