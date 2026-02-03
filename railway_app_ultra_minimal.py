@@ -1,6 +1,7 @@
 # Railway Ultra-Minimal Egg Detection API
 # Uses OpenCV for detection - smallest possible image size
 # Target: < 2GB Docker image
+# Saves data to both Supabase and SQLite
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,7 @@ import shutil
 from pathlib import Path
 from contextlib import asynccontextmanager
 from egg_detector_real import RealEggDetector
+from database import SQLiteManager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,6 +46,9 @@ supabase: Optional[Client] = None
 
 # Initialize egg detector
 detector = None
+
+# Initialize SQLite manager
+sqlite_manager = SQLiteManager()
 
 # Create uploads directory
 UPLOAD_DIR = Path("uploads")
@@ -86,6 +91,24 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now().isoformat(), "model": "OpenCV Edge Detection"}
 
+@app.get("/data/recent")
+async def get_recent_detections(limit: int = 10):
+    """Get recent detection records from SQLite"""
+    try:
+        records = sqlite_manager.get_recent_detections(limit)
+        return {"status": "success", "data": records, "count": len(records)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get recent detections: {str(e)}")
+
+@app.get("/data/statistics")
+async def get_statistics():
+    """Get database statistics from SQLite"""
+    try:
+        stats = sqlite_manager.get_statistics()
+        return {"status": "success", "data": stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get statistics: {str(e)}")
+
 @app.post("/detect")
 async def detect_eggs(file: UploadFile = File(...)):
     """OpenCV-based egg detection endpoint"""
@@ -120,6 +143,10 @@ async def detect_eggs(file: UploadFile = File(...)):
             "model_info": detection_result["model_info"]
         }
         
+        # Save to both Supabase and SQLite
+        supabase_success = False
+        sqlite_success = False
+        
         # Save to Supabase if available
         if supabase:
             try:
@@ -136,9 +163,24 @@ async def detect_eggs(file: UploadFile = File(...)):
                     "grade5_count": results["detection_results"]["grade5_count"],
                     "day": datetime.now().strftime("%Y-%m-%d")
                 }).execute()
+                supabase_success = True
                 print("✅ Saved to Supabase")
             except Exception as e:
                 print(f"❌ Supabase save failed: {e}")
+        
+        # Save to SQLite (always available)
+        try:
+            sqlite_success = sqlite_manager.save_detection(results)
+            if sqlite_success:
+                print("✅ Saved to SQLite")
+        except Exception as e:
+            print(f"❌ SQLite save failed: {e}")
+        
+        # Add storage info to response
+        results["storage_info"] = {
+            "supabase_saved": supabase_success,
+            "sqlite_saved": sqlite_success
+        }
         
         return JSONResponse(content=results)
                 

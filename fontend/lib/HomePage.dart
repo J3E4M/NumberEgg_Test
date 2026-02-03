@@ -549,6 +549,33 @@ class _HomePageState extends State<HomePage> {
 
   int get _totalEgg => _big + _medium + _small + _grade3 + _grade4 + _grade5;
 
+  /// ดึงข้อมูลสรุปไข่วันนี้ พยายามจาก Supabase ก่อน ถ้าไม่ได้ใช้ SQLite
+  Future<Map<String, int>> _getTodayEggSummary() async {
+    try {
+      debugPrint('🔄 Fetching today egg summary from Supabase...');
+      final supabaseData = await SupabaseService.getTodayEggSummary();
+      debugPrint('✅ Got data from Supabase: $supabaseData');
+      return supabaseData;
+    } catch (e) {
+      debugPrint('❌ Failed to get data from Supabase, falling back to SQLite: $e');
+      try {
+        final sqliteData = await EggDatabase.instance.getTodayEggSummary();
+        debugPrint('✅ Got data from SQLite: $sqliteData');
+        return sqliteData;
+      } catch (e2) {
+        debugPrint('❌ Failed to get data from SQLite too: $e2');
+        return {
+          'เบอร์ 0': 0,
+          'เบอร์ 1': 0,
+          'เบอร์ 2': 0,
+          'เบอร์ 3': 0,
+          'เบอร์ 4': 0,
+          'เบอร์ 5': 0,
+        };
+      }
+    }
+  }
+
   Future<void> _captureAndSave() async {
     try {
       // 🔐 ขอ permission
@@ -877,6 +904,9 @@ class _HomePageState extends State<HomePage> {
       _grade4 = 0;
       _grade5 = 0;
     });
+
+    // Refresh the UI to show new data
+    setState(() {});
   }
 
   final List<String> filters = [
@@ -911,14 +941,28 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ✅ FILTER (ทั้งหมด / ไข่วันนี้ / แนวโน้ม / รายงาน)
-              _buildAnalysisFilter(),
+              Row(
+                children: [
+                  Expanded(child: _buildAnalysisFilter()),
+                  const SizedBox(width: 10),
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        debugPrint('🔄 Manual refresh triggered');
+                      });
+                    },
+                    icon: const Icon(Icons.refresh, color: Colors.orange),
+                    tooltip: 'รีเฟรชข้อมูล',
+                  ),
+                ],
+              ),
 
               const SizedBox(height: 20),
 
               // 📈 CARD 1
               if (selectedFilter == 'ทั้งหมด' || selectedFilter == 'ไข่วันนี้')
                 FutureBuilder<Map<String, int>>(
-                  future: EggDatabase.instance.getTodayEggSummary(),
+                  future: _getTodayEggSummary(),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
                       return _resultCard(

@@ -47,7 +47,26 @@ class _HistoryPageState extends State<HistoryPage> {
   void initState() {
     super.initState();
     debugPrint("INIT HISTORY PAGE");
-    _historyFuture = EggDatabase.instance.getHistoryForUI();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    debugPrint("🔄 Loading history from SQLite...");
+    try {
+      final history = await EggDatabase.instance.getHistoryForUI();
+      debugPrint("📊 Found ${history.length} sessions in SQLite");
+      if (history.isNotEmpty) {
+        debugPrint("📋 Sample session: ${history.first}");
+      }
+      setState(() {
+        _historyFuture = Future.value(history);
+      });
+    } catch (e) {
+      debugPrint("❌ Error loading history: $e");
+      setState(() {
+        _historyFuture = Future.value([]);
+      });
+    }
   }
 
   // ฟังก์ชันช่วยเลือกสีตามขนาดไข่
@@ -182,13 +201,8 @@ class _HistoryPageState extends State<HistoryPage> {
   
   /// รีเฟรชข้อมูลประวัติ
   void _refreshHistory() {
-    setState(() {
-      if (selectedFilter == 'เลือกวันที่') {
-        _historyFuture = _getFilteredHistory();
-      } else {
-        _historyFuture = EggDatabase.instance.getHistoryForUI();
-      }
-    });
+    debugPrint("🔄 Refreshing history...");
+    _loadHistory();
   }
 
   /// ลบ session และ egg items ที่เกี่ยวข้อง
@@ -1203,6 +1217,20 @@ class _HistoryPageState extends State<HistoryPage> {
                   ),
                   Row(
                     children: [
+                      // Refresh button
+                      IconButton(
+                        onPressed: _refreshHistory,
+                        icon: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.refresh, color: Colors.blue.shade700),
+                        ),
+                        tooltip: 'รีเฟรชข้อมูล',
+                      ),
+                      const SizedBox(width: 8),
                       // Clear data button (เมนูเลือกวิธีลบ)
                       PopupMenuButton<String>(
                         icon: Container(
