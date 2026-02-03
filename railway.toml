@@ -1,8 +1,9 @@
 [build]
 builder = "dockerfile"
+dockerfilePath = "Dockerfile.optimized"
 
 [deploy]
-startCommand = "python railway_app_real.py"
+startCommand = "python railway_app_yolo.py"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 healthcheckPath = "/health"

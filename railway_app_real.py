@@ -14,9 +14,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Load ONNX model
-session = ort.InferenceSession("yolov8n.onnx")
-input_name = session.get_inputs()[0].name
+# ✅ Load local ONNX model
+try:
+    session = ort.InferenceSession("yolov8n.pt")
+    input_name = session.get_inputs()[0].name
+    print("✅ Loaded local YOLOv8n model successfully")
+except Exception as e:
+    print(f"❌ Failed to load local model: {e}")
+    # Fallback to download if local model not found
+    import urllib.request
+    print("⬇️ Downloading YOLOv8n ONNX model...")
+    urllib.request.urlretrieve("https://huggingface.co/ultralytics/YOLOv8/resolve/main/yolov8n.onnx", "yolov8n.onnx")
+    session = ort.InferenceSession("yolov8n.onnx")
+    input_name = session.get_inputs()[0].name
+    print("✅ Downloaded and loaded YOLOv8n model")
 
 CLASS_NAMES = {
     0: "egg",
@@ -25,6 +36,10 @@ CLASS_NAMES = {
 @app.get("/")
 async def root():
     return {"status": "ok", "model": "YOLOv8n ONNX"}
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "model": "YOLOv8n ONNX"}
 
 @app.post("/detect")
 async def detect(file: UploadFile = File(...)):
