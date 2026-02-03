@@ -941,21 +941,7 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ✅ FILTER (ทั้งหมด / ไข่วันนี้ / แนวโน้ม / รายงาน)
-              Row(
-                children: [
-                  Expanded(child: _buildAnalysisFilter()),
-                  const SizedBox(width: 10),
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        debugPrint('🔄 Manual refresh triggered');
-                      });
-                    },
-                    icon: const Icon(Icons.refresh, color: Colors.orange),
-                    tooltip: 'รีเฟรชข้อมูล',
-                  ),
-                ],
-              ),
+              _buildAnalysisFilter(),
 
               const SizedBox(height: 20),
 

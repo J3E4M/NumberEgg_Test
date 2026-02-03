@@ -408,45 +408,20 @@ class SupabaseService {
   static Future<Map<String, int>> getTodayEggSummary() async {
     try {
       final today = DateTime.now().toIso8601String().substring(0, 10);
-      debugPrint('🔍 Querying Supabase for date: $today');
       
       final response = await client
           .from('egg_session')
           .select('''
-            day,
             grade0_count,
             grade1_count,
             grade2_count,
             grade3_count,
             grade4_count,
-            grade5_count,
-            created_at
+            grade5_count
           ''')
           .eq('day', today);
 
       final sessions = List<Map<String, dynamic>>.from(response);
-      debugPrint('📊 Found ${sessions.length} sessions for today: $sessions');
-      
-      // Also check if there are any recent sessions (last 7 days)
-      final weekAgo = DateTime.now().subtract(const Duration(days: 7)).toIso8601String().substring(0, 10);
-      final recentResponse = await client
-          .from('egg_session')
-          .select('''
-            day,
-            grade0_count,
-            grade1_count,
-            grade2_count,
-            grade3_count,
-            grade4_count,
-            grade5_count,
-            created_at
-          ''')
-          .gte('day', weekAgo)
-          .order('created_at', ascending: false)
-          .limit(10);
-
-      final recentSessions = List<Map<String, dynamic>>.from(recentResponse);
-      debugPrint('📊 Recent sessions (last 7 days): $recentSessions');
       
       final summary = {
         'เบอร์ 0': 0,
@@ -470,19 +445,6 @@ class SupabaseService {
       return summary;
     } catch (e) {
       debugPrint('❌ Error getting today egg summary from Supabase: $e');
-      
-      // Try to get any sessions at all to debug
-      try {
-        final allResponse = await client
-            .from('egg_session')
-            .select('day, grade0_count, created_at')
-            .limit(5);
-        final allSessions = List<Map<String, dynamic>>.from(allResponse);
-        debugPrint('🔍 All available sessions (sample): $allSessions');
-      } catch (e2) {
-        debugPrint('❌ Could not get any sessions: $e2');
-      }
-      
       // Return empty summary if error
       return {
         'เบอร์ 0': 0,
@@ -492,6 +454,30 @@ class SupabaseService {
         'เบอร์ 4': 0,
         'เบอร์ 5': 0,
       };
+    }
+  }
+
+  /// ดึงข้อมูลประวัติสำหรับแสดงใน UI จาก Supabase
+  static Future<List<Map<String, dynamic>>> getHistoryForUI() async {
+    try {
+      debugPrint('🔄 Fetching history from Supabase...');
+      final response = await client
+          .from('egg_session')
+          .select('''
+            *,
+            users (
+              id,
+              name
+            )
+          ''')
+          .order('created_at', ascending: false);
+
+      final sessions = List<Map<String, dynamic>>.from(response);
+      debugPrint('✅ Got ${sessions.length} sessions from Supabase');
+      return sessions;
+    } catch (e) {
+      debugPrint('❌ Error getting history from Supabase: $e');
+      return [];
     }
   }
 

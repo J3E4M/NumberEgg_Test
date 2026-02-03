@@ -279,6 +279,22 @@ class DisplayPictureScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.save),
+                label: const Text("บันทึกผลการตรวจไข่"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                onPressed: () async {
+                  await _saveToDatabase(context);
+                },
+              ),
             ],
           );
         },

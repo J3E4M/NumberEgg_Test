@@ -2,46 +2,34 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 
 class ServerConfig {
-  // การตั้งค่า Supabase
-  static const String _supabaseUrl = 'https://gbxxwojlihgrbtthmusq.supabase.co'; // URL ของ Supabase
+  // Supabase Configuration
+  static const String _supabaseUrl = 'https://gbxxwojlihgrbtthmusq.supabase.co'; // Supabase URL
   static const String _supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdieHh3b2psaWhncmJ0dGhtdXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5NTQ1MjYsImV4cCI6MjA3OTUzMDUyNn0.-XKw6NOhrWBxp4gLvQbPExLU2PHhUfUWdD3zsSc_9_k';
   
-  // URL สำหรับ API การตรวจจับ
-  static const String _railwayUrl = 'https://numbereggrailway-production.up.railway.app'; // Railway URL (สำหรับใช้งานจริง)
-  static const String _developmentUrl = 'http://localhost:8000'; // สำหรับพัฒนาในเครื่อง
-  static const String _stagingUrl = 'https://your-staging-server.com'; // เซิร์ฟเวอร์ทดสอบ
-  static const String _localNetworkUrl = 'http://192.168.1.100:8000'; // IP ในเครือข่ายภายใน
-  static const String _simpleServerUrl = 'http://localhost:8000'; // สำหรับ simple_server.py
+  // Detection API URLs
+  static const String _railwayUrl = 'https://numbereggrailway-production.up.railway.app'; // Railway URL (production) - เปลี่ยนตาม URL จริง
+  static const String _developmentUrl = 'http://localhost:8000'; // Local development
+  static const String _stagingUrl = 'https://your-staging-server.com'; // Staging server
+  static const String _localNetworkUrl = 'http://192.168.1.100:8000'; // Local network IP
+  static const String _simpleServerUrl = 'http://localhost:8000'; // For simple_server.py
   
-  // เลือกสภาพแวดล้อมที่จะใช้
+  // Environment selection
   static const String _currentEnvironment = 'production'; // development, staging, production, simple, local_network
   
-  /// ดึง URL สำหรับการตรวจจับวัตถุ (Detection API)
+  /// ดึง URL สำหรับการตรวจจับ (Detection API)
   static Future<String> getDetectUrl() async {
     return '${await getApiUrl()}/detect';
   }
   
-  /// ดึง URL สำหรับ API หลัก
+  /// ดึง URL สำหรับ API หลัก (Detection API)
   static Future<String> getApiUrl() async {
-    // ใช้สภาพแวดล้อมที่กำหนดไว้โดยตรง ไม่สนใจ debug/production mode
-    return _getEnvironmentUrl();
-  }
-  
-  static String _getEnvironmentUrl() {
-    switch (_currentEnvironment) {
-      case 'development':
-        return _developmentUrl;
-      case 'staging':
-        return _stagingUrl;
-      case 'production':
-        return _railwayUrl;
-      case 'simple':
-        return _simpleServerUrl;
-      case 'local_network':
-        return _localNetworkUrl;
-      default:
-        return _railwayUrl; // ค่าเริ่มต้นคือ Railway
+    // ถ้าเป็น debug mode ให้ใช้ development URL
+    if (kDebugMode) {
+      return _getDevelopmentUrl();
     }
+    
+    // ถ้าเป็น production ให้ใช้ production URL
+    return _getProductionUrl();
   }
   
   static String _getDevelopmentUrl() {

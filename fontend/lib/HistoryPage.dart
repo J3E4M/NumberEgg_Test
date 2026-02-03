@@ -47,25 +47,37 @@ class _HistoryPageState extends State<HistoryPage> {
   void initState() {
     super.initState();
     debugPrint("INIT HISTORY PAGE");
-    _loadHistory();
+    _historyFuture = _getHistoryForUI();
   }
 
-  Future<void> _loadHistory() async {
-    debugPrint("🔄 Loading history from SQLite...");
-    try {
-      final history = await EggDatabase.instance.getHistoryForUI();
-      debugPrint("📊 Found ${history.length} sessions in SQLite");
-      if (history.isNotEmpty) {
-        debugPrint("📋 Sample session: ${history.first}");
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh data when page becomes visible again
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _refreshHistory();
       }
-      setState(() {
-        _historyFuture = Future.value(history);
-      });
+    });
+  }
+
+  /// ดึงข้อมูลประวัติ พยายามจาก Supabase ก่อน ถ้าไม่ได้ใช้ SQLite
+  Future<List<Map<String, dynamic>>> _getHistoryForUI() async {
+    try {
+      debugPrint('🔄 Fetching history from Supabase...');
+      final supabaseData = await SupabaseService.getHistoryForUI();
+      debugPrint('✅ Got ${supabaseData.length} sessions from Supabase');
+      return supabaseData;
     } catch (e) {
-      debugPrint("❌ Error loading history: $e");
-      setState(() {
-        _historyFuture = Future.value([]);
-      });
+      debugPrint('❌ Failed to get history from Supabase, falling back to SQLite: $e');
+      try {
+        final sqliteData = await EggDatabase.instance.getHistoryForUI();
+        debugPrint('✅ Got ${sqliteData.length} sessions from SQLite');
+        return sqliteData;
+      } catch (e2) {
+        debugPrint('❌ Failed to get history from SQLite too: $e2');
+        return [];
+      }
     }
   }
 
@@ -201,8 +213,13 @@ class _HistoryPageState extends State<HistoryPage> {
   
   /// รีเฟรชข้อมูลประวัติ
   void _refreshHistory() {
-    debugPrint("🔄 Refreshing history...");
-    _loadHistory();
+    setState(() {
+      if (selectedFilter == 'เลือกวันที่') {
+        _historyFuture = _getFilteredHistory();
+      } else {
+        _historyFuture = _getHistoryForUI();
+      }
+    });
   }
 
   /// ลบ session และ egg items ที่เกี่ยวข้อง
@@ -1228,7 +1245,6 @@ class _HistoryPageState extends State<HistoryPage> {
                           ),
                           child: Icon(Icons.refresh, color: Colors.blue.shade700),
                         ),
-                        tooltip: 'รีเฟรชข้อมูล',
                       ),
                       const SizedBox(width: 8),
                       // Clear data button (เมนูเลือกวิธีลบ)
