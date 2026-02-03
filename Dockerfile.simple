@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # Copy requirements first for better layer caching
-COPY requirements_ultra_minimal.txt requirements.txt
+COPY requirements_simple.txt requirements.txt
 
 # Install Python packages with optimizations
 RUN pip install --no-cache-dir --user --upgrade pip setuptools wheel \
@@ -60,6 +60,7 @@ COPY --from=builder /root/.local /root/.local
 COPY railway_app_ultra_minimal.py .
 COPY egg_detector_real.py .
 COPY database.py .
+COPY simple_server.py .
 
 # Create necessary directories
 RUN mkdir -p /app/uploads
