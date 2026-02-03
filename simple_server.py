@@ -6,7 +6,9 @@ import cv2
 import numpy as np
 import os
 import urllib.request
-import uvicorn # ✅ Import uvicorn ตรงนี้เลย
+import uvicorn
+from PIL import Image
+import io
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -121,22 +123,41 @@ async def detect(file: UploadFile = File(...)):
         image_bytes = await file.read()
         print(f"Received image: {len(image_bytes)} bytes")
         
-        # Convert bytes to numpy array properly
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        print(f"Created numpy array: {nparr.shape}, dtype: {nparr.dtype}")
-        
-        # Decode image
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
-        if img is None:
-            print("❌ Failed to decode image - invalid format")
-            return {
-                "count": 0,
-                "detections": [],
-                "error": "Invalid image format - could not decode"
-            }
-        
-        print(f"✅ Image decoded successfully: {img.shape}")
+        # Use PIL to open image first (more reliable)
+        try:
+            # Open with PIL
+            pil_image = Image.open(io.BytesIO(image_bytes))
+            
+            # Convert to RGB if needed
+            if pil_image.mode != 'RGB':
+                pil_image = pil_image.convert('RGB')
+            
+            print(f"✅ PIL image opened: {pil_image.size}, mode: {pil_image.mode}")
+            
+            # Convert PIL to numpy array (OpenCV compatible)
+            img_array = np.array(pil_image)
+            
+            # Convert RGB to BGR for OpenCV
+            if len(img_array.shape) == 3:
+                img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+            else:
+                img = img_array
+                
+            print(f"✅ Converted to OpenCV format: {img.shape}")
+            
+        except Exception as pil_error:
+            print(f"❌ PIL failed: {pil_error}")
+            # Fallback to OpenCV direct method
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if img is None:
+                print("❌ Both PIL and OpenCV failed to decode image")
+                return {
+                    "count": 0,
+                    "detections": [],
+                    "error": "Invalid image format - could not decode with PIL or OpenCV"
+                }
         
         # Run YOLO detection
         results = model(img)[0]
