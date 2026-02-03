@@ -373,12 +373,12 @@ class TodayEggDonutChart extends StatelessWidget {
     final total = grade0 + grade1 + grade2 + grade3 + grade4 + grade5;
 
     final items = [
-      _EggItem('เบอร์ 0', grade0, Colors.red),
-      _EggItem('เบอร์ 1', grade1, Colors.orange),
-      _EggItem('เบอร์ 2', grade2, Colors.amber),
-      _EggItem('เบอร์ 3', grade3, Colors.green),
-      _EggItem('เบอร์ 4', grade4, Colors.blueGrey),
-      _EggItem('เบอร์ 5', grade5, Colors.grey),
+      _EggItem('เบอร์ 0', grade0, Colors.green),      // ดีที่สุด
+      _EggItem('เบอร์ 1', grade1, Colors.lightGreen),
+      _EggItem('เบอร์ 2', grade2, Colors.yellow),
+      _EggItem('เบอร์ 3', grade3, Colors.orange),
+      _EggItem('เบอร์ 4', grade4, Colors.deepOrange),
+      _EggItem('เบอร์ 5', grade5, Colors.red),        // แย่ที่สุด
     ];
 
     final maxItem = items.reduce((a, b) => a.count >= b.count ? a : b);
@@ -835,6 +835,16 @@ class _HomePageState extends State<HomePage> {
         ),
       );
       
+    } catch (e) {
+      debugPrint("❌ Error saving to Supabase: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("บันทึกลง Supabase ล้มเหลว: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+    
     try {
       // 🗄️ STEP 1: บันทึกลง SQLite ก่อน (Offline First)
       debugPrint("🗄️ HomePage: Saving manual data to SQLite first...");
@@ -949,7 +959,7 @@ class _HomePageState extends State<HomePage> {
                         grade3: data['เบอร์ 3'] ?? 0,
                         grade4: data['เบอร์ 4'] ?? 0,
                         grade5: data['เบอร์ 5'] ?? 0,
-                      ),
+                      ),    
                     );
                   },
                 ),

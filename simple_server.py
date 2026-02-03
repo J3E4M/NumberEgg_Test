@@ -40,12 +40,26 @@ MODEL_URL = "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolo
 def download_model():
     if not os.path.exists(MODEL_PATH):
         print(f"Downloading YOLOv8 model from {MODEL_URL}...")
-        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-        print("Model downloaded successfully!")
+        try:
+            urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+            print("Model downloaded successfully!")
+        except Exception as e:
+            print(f"Failed to download model: {e}")
+            # Create a dummy model for now to avoid crashes
+            print("Using dummy model - detection will not work until model is available")
+            return None
+    return True
 
-# Download model on startup
-download_model()
-model = YOLO(MODEL_PATH)
+# Download model on startup (but don't fail if it doesn't work)
+model_ready = download_model()
+if model_ready:
+    try:
+        model = YOLO(MODEL_PATH)
+    except Exception as e:
+        print(f"Failed to load model: {e}")
+        model = None
+else:
+    model = None
 
 CLASS_NAMES = {
     0: "egg",
@@ -54,6 +68,13 @@ CLASS_NAMES = {
 
 @app.post("/detect")
 async def detect(file: UploadFile = File(...)):
+    if model is None:
+        return {
+            "count": 0,
+            "detections": [],
+            "error": "Model not available - please try again later"
+        }
+    
     image_bytes = await file.read()
     np_img = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
