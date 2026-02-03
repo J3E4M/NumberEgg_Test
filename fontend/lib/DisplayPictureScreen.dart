@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'dart:math' as math;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,6 +35,22 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
   bool isSaving = false;
   bool isSaved = false;
   bool isLocalSaved = false;
+  ui.Image? _decodedImage; // เก็บขนาดภาพจริง
+
+  @override
+  void initState() {
+    super.initState();
+    _decodeImage(); // ถอดรหัสภาพเพื่อได้ขนาดจริง
+  }
+
+  Future<void> _decodeImage() async {
+    if (widget.imageBytes != null) {
+      final image = await decodeImageFromList(widget.imageBytes!);
+      setState(() {
+        _decodedImage = image;
+      });
+    }
+  }
 
   Future<String> _ensureLocalImagePath() async {
     try {
@@ -144,32 +162,8 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
           // ตรวจสอบว่า grade ไม่เป็น null
           if (detection.grade == null) continue;
           
-          // แปลง grade string เป็นตัวเลข (NEW SYSTEM - grade0-5 เท่านั้น)
-          int grade;
-          switch (detection.grade!.toLowerCase()) {
-            // New system (จาก Railway ใหม่)
-            case 'grade0':
-              grade = 0;  // เบอร์ 0 (พิเศษ)
-              break;
-            case 'grade1':
-              grade = 1;  // เบอร์ 1 (ใหญ่)
-              break;
-            case 'grade2':
-              grade = 2;  // เบอร์ 2 (กลาง)
-              break;
-            case 'grade3':
-              grade = 3;  // เบอร์ 3 (เล็ก)
-              break;
-            case 'grade4':
-              grade = 4;  // เบอร์ 4 (เล็กมาก)
-              break;
-            case 'grade5':
-              grade = 5;  // เบอร์ 5 (พิเศษเล็ก)
-              break;
-            
-            default:
-              grade = 2;  // default เป็นกลาง
-          }
+          // ใช้ grade จาก Detection โดยตรง (NEW SYSTEM - grade0-5 เท่านั้น)
+          int grade = detection.grade!;
           
           eggItems.add({
             'grade': grade,
@@ -435,11 +429,31 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: widget.imageBytes != null
-                    ? Image.memory(
-                        widget.imageBytes!,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
+                    ? SizedBox(
+                        height: 300, // กำหนดความสูงตายตัว
+                        child: Stack(
+                          children: [
+                            Image.memory(
+                              widget.imageBytes!,
+                              fit: BoxFit.contain, // ใช้ contain เพื่อไม่ให้ภาพถูก crop
+                              width: double.infinity,
+                              height: double.infinity,
+                            ),
+                            // 🎨 วาด bounding box และ labels โดยใช้ LayoutBuilder เพื่อได้ขนาดจริง
+                            if (widget.detections != null && _decodedImage != null)
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return CustomPaint(
+                                    painter: YoloPainter(
+                                      widget.detections!,
+                                      Size(_decodedImage!.width.toDouble(), _decodedImage!.height.toDouble()), // ขนาดภาพต้นฉบับ
+                                      Size(constraints.maxWidth, constraints.maxHeight), // ขนาด display จริง
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
                       )
                     : (widget.imagePath.startsWith('http') 
                         ? CachedNetworkImage(
@@ -618,33 +632,34 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
     Color gradeColor;
     IconData gradeIcon;
     
-    switch (detection.grade.toLowerCase()) {
-      case 'grade0':
+    // ใช้ grade จาก Detection โดยตรง (int ไม่ใช่ string)
+    switch (detection.grade) {
+      case 0:
         gradeText = "เบอร์ 0 (พิเศษ)";
         gradeColor = Colors.red;
         gradeIcon = Icons.egg;
         break;
-      case 'grade1':
+      case 1:
         gradeText = "เบอร์ 1 (ใหญ่)";
         gradeColor = Colors.orange;
         gradeIcon = Icons.egg;
         break;
-      case 'grade2':
+      case 2:
         gradeText = "เบอร์ 2 (กลาง)";
         gradeColor = Colors.amber;
         gradeIcon = Icons.egg_alt;
         break;
-      case 'grade3':
+      case 3:
         gradeText = "เบอร์ 3 (เล็ก)";
         gradeColor = Colors.green;
         gradeIcon = Icons.egg_outlined;
         break;
-      case 'grade4':
+      case 4:
         gradeText = "เบอร์ 4 (เล็กมาก)";
         gradeColor = Colors.blueGrey;
         gradeIcon = Icons.egg_outlined;
         break;
-      case 'grade5':
+      case 5:
         gradeText = "เบอร์ 5 (พิเศษเล็ก)";
         gradeColor = Colors.grey;
         gradeIcon = Icons.egg_outlined;
@@ -765,4 +780,103 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
     
     return (totalConfidence / widget.detections!.length) * 100;
   }
+}
+
+/// ================== YOLO PAINTER ==================
+class YoloPainter extends CustomPainter {
+  final List<Detection> detections;
+  final Size originalImageSize; // ขนาดภาพต้นฉบับจริง (เช่น 1920x1080)
+  final Size displaySize; // ขนาดพื้นที่แสดงผลบนหน้าจอ (เช่น 400x300)
+
+  // ⭐ เพิ่มตรงนี้
+  final double cmPerPixel = 0.02; // ปรับตามการวัดจริง
+
+  YoloPainter(this.detections, this.originalImageSize, this.displaySize);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (detections.isEmpty) return;
+
+    // 1. คำนวณ Scale Factor สำหรับ BoxFit.contain
+    // BoxFit.contain จะยึดด้านที่สั้นกว่าเป็นหลักเพื่อให้ภาพอยู่ในกรอบ
+    final scaleX = displaySize.width / originalImageSize.width;
+    final scaleY = displaySize.height / originalImageSize.height;
+    final scale = scaleX < scaleY ? scaleX : scaleY;
+
+    // 2. คำนวณขนาดภาพหลังจากย่อแล้ว
+    final displayImageWidth = originalImageSize.width * scale;
+    final displayImageHeight = originalImageSize.height * scale;
+
+    // 3. คำนวณ Offset สำหรับจัดวางภาพตรงกลาง
+    // (ระยะขอบดำซ้าย-ขวา หรือ บน-ล่าง)
+    final offsetX = (displaySize.width - displayImageWidth) / 2;
+    final offsetY = (displaySize.height - displayImageHeight) / 2;
+
+    final boxPaint = Paint()
+      ..color = Colors.green
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    for (final d in detections) {
+      // 4. แปลงพิกัดจาก YOLO coordinates ไปยัง display coordinates
+      // สูตร: (พิกัดเดิม * scale) + offset
+      final rect = Rect.fromLTRB(
+        d.x1 * scale + offsetX,
+        d.y1 * scale + offsetY,
+        d.x2 * scale + offsetX,
+        d.y2 * scale + offsetY,
+      );
+
+      canvas.drawRect(rect, boxPaint);
+
+      // 📐 คำนวณขนาดจาก YOLO coordinates
+      final widthPx = (d.x2 - d.x1);
+      final heightPx = (d.y2 - d.y1);
+
+      final widthCm = widthPx * cmPerPixel;
+      final heightCm = heightPx * cmPerPixel;
+
+      // 🏷 Label + confidence + size + grade
+      final gradeText = _getGradeText(d.grade ?? 0);
+      
+      final label = "$gradeText ${(d.confidence * 100).toStringAsFixed(1)}%\n"
+          "${widthCm.toStringAsFixed(1)} x ${heightCm.toStringAsFixed(1)} cm";
+
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            backgroundColor: Colors.black87,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      // 📍 วาด label เหนือกรอบ
+      final labelOffset = Offset(
+        rect.left,
+        rect.top - textPainter.height - 4,
+      );
+
+      textPainter.paint(canvas, labelOffset);
+    }
+  }
+
+  String _getGradeText(int grade) {
+    switch (grade) {
+      case 0: return "เบอร์ 0";
+      case 1: return "เบอร์ 1";
+      case 2: return "เบอร์ 2";
+      case 3: return "เบอร์ 3";
+      case 4: return "เบอร์ 4";
+      case 5: return "เบอร์ 5";
+      default: return "Unknown";
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

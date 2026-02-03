@@ -23,12 +23,7 @@ class ServerConfig {
   
   /// ดึง URL สำหรับ API หลัก (Detection API)
   static Future<String> getApiUrl() async {
-    // ถ้าเป็น debug mode ให้ใช้ development URL
-    if (kDebugMode) {
-      return _getDevelopmentUrl();
-    }
-    
-    // ถ้าเป็น production ให้ใช้ production URL
+    // ใช้ production URL เสมอ (ทั้ง debug และ release)
     return _getProductionUrl();
   }
   
